@@ -1,0 +1,120 @@
+# CLAUDE.md
+
+Instructions for Claude (or any AI assistant) working in this repository.
+
+## Purpose
+
+This repo tracks one FFXIV raid static's progression through **Dancing Mad
+(Ultimate)** (DMU), Final Fantasy XIV's 7th ultimate raid (patch 7.51,
+released June 2, 2026). It pulls pull-by-pull log data from FFLogs and turns
+it into a static HTML dashboard: fight progress per raid night, recurring
+wipe points ("pitfalls"), pull volume/duration stats, and hour-by-hour
+performance across the raid's fixed schedule.
+
+The goal is a **repeatable, zero-manual-effort refresh loop**: raid → run two
+scripts → get an updated dashboard. Nobody should have to hand-edit data,
+recompute stats, or touch chart code to see updated numbers after a raid
+night.
+
+## How the pieces fit together
+
+```
+FFLogs API  →  fetch_dmu_logs.py  →  pulls.csv  →  build_dashboard.py  →  dmu_raid_dashboard.html
+                                   →  reports_raw.json (backup)
+                                   →  session_summary.json (legacy, not required by build_dashboard.py)
+```
+
+| File | Role |
+|---|---|
+| `main.py` | Authenticates to FFLogs v2 GraphQL API (client-credentials flow), fetches all reports for the guild filtered to the DMU zone, flattens every pull into `pulls.csv`. |
+| `pulls.csv` | Source of truth. One row per pull: date/time, kill/wipe, `fight_percentage`, `boss_percentage`, `last_phase`, duration. Everything downstream is derived from this file alone. |
+| `build_dashboard.py` | Reads `pulls.csv`, computes all aggregates (session boundaries, phase histograms, hour-by-raid-night grid), injects them as JSON into `dashboard_template.html`, writes the final HTML. |
+| `dashboard_template.html` | The visual shell — HTML/CSS/Chart.js. Contains `__DATA_JSON__`, `__DATE_RANGE__`, `__RESET_NOTE__` placeholders that `build_dashboard.py` fills in. All data access in the JS reads from a single injected `DATA` object. |
+| `dmu_raid_dashboard.html` | Final build artifact. Fully self-contained (Chart.js loaded from cdnjs, fonts from Google Fonts) — can be opened directly in a browser or hosted as a static file. |
+
+**Rule of thumb:** styling and layout changes go in `dashboard_template.html`.
+Data/aggregation changes go in `build_dashboard.py`. Don't hand-edit
+`dmu_raid_dashboard.html` — it's a generated artifact and will be overwritten
+on the next build.
+
+## Domain knowledge specific to this project
+
+These are non-obvious things learned while building this, worth knowing
+before changing the aggregation logic:
+
+- **DMU's 5 phases are not separate FFLogs "fights."** All phases (Kefka →
+  God Kefka → Exdeath & Chaos → Kefka again → Ultima Kefka) show up as a
+  single fight named `"Dancing Mad"` in the API. Progress within the pull is
+  tracked via the `lastPhase` field (1–5), not by fight name. Don't filter
+  on fight name expecting per-phase fights.
+
+- **`fight_percentage` vs `boss_percentage` are very different things.**
+  - `fight_percentage` (used throughout this dashboard) is FFLogs' own
+    "overall encounter completion" metric — it decreases monotonically from
+    100% (pull start) to 0% (kill) across the *entire* multi-phase encounter.
+    This is the correct field for "how far did this pull get."
+  - `boss_percentage` is the raw HP% of whatever enemy is currently active.
+    It resets close to 100% every time a new phase's boss/add spawns, so it
+    is **not** comparable across phases and should not be used for overall
+    progress tracking. It's kept in `pulls.csv` for reference but not
+    currently charted.
+
+- **~20 pulls have `null` `fight_percentage` / `last_phase == 0`.** These are
+  very short (<75s) practice/reset pulls, likely mid-fight practice starts.
+  `build_dashboard.py` counts them in `overview.reset_pulls` and in the
+  phase-composition chart, but excludes them from the phase histograms
+  ("pitfalls" section) since they don't represent a real death point.
+
+- **Raid schedule is fixed local-time, not fixed UTC.** The static raids
+  20:00–23:00 CEST. Because CEST/CET shifts relative to UTC across the year,
+  the hour-by-hour analysis converts UTC timestamps to local time via
+  `--utc-offset` (2 for CEST, 1 for CET) rather than bucketing on raw UTC
+  hour. If the static's schedule or timezone changes, pass
+  `--utc-offset` / `--raid-start-hour` / `--raid-length-hours` accordingly
+  — don't hardcode new values into the script.
+
+- **The dashboard is built to extend to phases 4 and 5 automatically.** The
+  progress chart, pitfalls section, and phase legend in
+  `dashboard_template.html` derive their phase list from whatever appears in
+  the injected data (`phase_composition` / `phase_stats` keys), not from a
+  hardcoded "phases 1–3." When the group starts reaching phase 4/5, no
+  template changes should be needed — if they are, that's a bug to fix by
+  making the relevant section data-driven, not by adding a special case.
+
+- **Zero kills so far is expected, not a bug.** The raid released June 2,
+  2026 and this static started raiding June 3. `overview.total_kills` will
+  be 0 until the first clear. When a kill does happen, `pulls.csv` will have
+  `kill == True` for that row — no schema changes needed, but double check
+  the dashboard's presentation still makes sense at that point (e.g. whether
+  a "cleared" state deserves its own hero treatment).
+
+## Running things
+
+```bash
+uv sync
+
+# one-time: create an FFLogs API client at https://www.fflogs.com/api/clients/
+# and put FFLOGS_CLIENT_ID / FFLOGS_CLIENT_SECRET in a local .env file
+
+uv run main.py --guild-id 102435
+uv run build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
+```
+
+See `README.md` for full setup and flag documentation.
+
+## Conventions
+
+- Python: stdlib + `requests`, `python-dotenv`, `pandas`. No other
+  dependencies without a good reason — this is meant to stay a two-script,
+  easy-to-audit pipeline.
+- No secrets in the repo. `.env` holding `FFLOGS_CLIENT_ID` /
+  `FFLOGS_CLIENT_SECRET` must stay out of version control (add to
+  `.gitignore` if not already there).
+- `dashboard_template.html` has no build step — it's plain HTML/CSS/JS with
+  Chart.js from a CDN. Keep it that way; don't introduce a bundler or
+  framework for what's currently a single static file.
+- When adding new aggregate stats, add them to the `data` dict in
+  `build_dashboard.py` and consume them in `dashboard_template.html` via the
+  global `DATA` object — don't invent a second data-passing mechanism.
+- Prefer deriving new stats from `pulls.csv` alone over requiring additional
+  input files, to keep the "two commands to refresh" workflow intact.

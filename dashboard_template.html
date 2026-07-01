@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dancing Mad (Ultimate) — Raid Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500;1,9..144,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #120e1a;
+    --bg-panel: #1a1424;
+    --bg-panel-2: #221a30;
+    --hairline: #352a48;
+    --ink: #f1ecf8;
+    --ink-dim: #9c8fb8;
+    --ink-faint: #6c6087;
+    --magenta: #ff3f8f;
+    --magenta-dim: #c72e6f;
+    --gold: #ffc73f;
+    --gold-dim: #d1a230;
+    --violet: #8b6bff;
+    --violet-dim: #6b4fd1;
+    --grey: #4a4160;
+    --good: #6ee7b7;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,63,143,0.10), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(139,107,255,0.08), transparent),
+      var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3, .display{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+
+  .wrap{max-width:1100px; margin:0 auto; padding:0 28px;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    padding:76px 0 40px;
+    border-bottom:1px solid var(--hairline);
+    position:relative;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--magenta);
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px; height:1px;
+    background:var(--magenta);
+    display:inline-block;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap:48px;
+    align-items:end;
+  }
+  .hero h1{
+    font-size:clamp(40px, 6vw, 68px);
+    line-height:0.98;
+    margin:0 0 18px;
+    color:var(--ink);
+  }
+  .hero h1 em{
+    font-style:italic;
+    color:var(--magenta);
+  }
+  .hero p{
+    color:var(--ink-dim);
+    font-size:15px;
+    max-width:52ch;
+    margin:0;
+  }
+  .hero-stat{
+    text-align:right;
+  }
+  .hero-stat .num{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-style:italic;
+    font-size:clamp(56px, 9vw, 108px);
+    line-height:0.85;
+    color:var(--gold);
+    display:block;
+  }
+  .hero-stat .num sup{
+    font-size:0.35em;
+    top:-0.5em;
+  }
+  .hero-stat .cap{
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-top:4px;
+  }
+
+  /* ---------- HP RAIL (signature element) ---------- */
+  .rail-section{padding:36px 0 10px;}
+  .rail-label-row{
+    display:flex; justify-content:space-between;
+    font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:8px;
+  }
+  .rail{
+    position:relative;
+    height:54px;
+    border-radius:6px;
+    background:var(--bg-panel-2);
+    border:1px solid var(--hairline);
+    overflow:hidden;
+  }
+  .rail-fill{
+    position:absolute; inset:0;
+    background: linear-gradient(90deg,
+      var(--grey) 0%, var(--grey) 0%,
+      var(--gold) 9%, var(--gold-dim) 29%,
+      var(--magenta) 29%, var(--magenta-dim) 50%,
+      var(--violet) 50%, var(--violet-dim) 100%
+    );
+    clip-path: inset(0 calc(100% - var(--pct)) 0 0);
+    transition:clip-path 1.2s cubic-bezier(.16,1,.3,1);
+  }
+  .rail-track{
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(90deg, transparent, transparent 9px, rgba(0,0,0,.18) 9px, rgba(0,0,0,.18) 10px);
+  }
+  .rail-marker{
+    position:absolute; top:-6px; bottom:-6px;
+    width:2px; background:var(--ink);
+    left:var(--pct);
+    box-shadow:0 0 12px 2px rgba(241,236,248,0.6);
+  }
+  .rail-marker::after{
+    content:attr(data-label);
+    position:absolute; top:-24px; left:50%; transform:translateX(-50%);
+    font-size:11px; white-space:nowrap; color:var(--ink);
+    font-weight:600;
+  }
+  .rail-ticks{
+    display:flex; justify-content:space-between;
+    font-size:10px; color:var(--ink-faint); margin-top:6px;
+  }
+  .rail-phases{
+    display:flex; gap:18px; margin-top:18px; flex-wrap:wrap;
+  }
+  .rail-phase-tag{
+    font-size:11px; color:var(--ink-dim); display:flex; align-items:center; gap:7px;
+  }
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+
+  /* ---------- KPI STRIP ---------- */
+  .kpi-strip{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    border-top:1px solid var(--hairline);
+    border-bottom:1px solid var(--hairline);
+    margin-top:40px;
+  }
+  .kpi{
+    padding:22px 18px;
+    border-right:1px solid var(--hairline);
+  }
+  .kpi:last-child{border-right:none;}
+  .kpi .val{
+    font-family:'Fraunces', serif; font-weight:700; font-size:28px; color:var(--ink);
+    display:block;
+  }
+  .kpi .lbl{
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint);
+    margin-top:4px;
+  }
+
+  /* ---------- SECTIONS ---------- */
+  section.block{padding:64px 0;}
+  section.block + section.block{border-top:1px solid var(--hairline);}
+  .block-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px; flex-wrap:wrap; gap:10px;
+  }
+  .block-head h2{font-size:26px; margin:0; color:var(--ink);}
+  .block-head .tag{
+    font-size:11px; color:var(--ink-faint); letter-spacing:0.06em; text-transform:uppercase;
+  }
+  .block-desc{color:var(--ink-dim); font-size:13.5px; max-width:70ch; margin:0 0 32px;}
+
+  .chart-card{
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:24px 22px 14px;
+  }
+  .chart-card canvas{max-width:100%;}
+
+  /* ---------- PITFALLS GRID ---------- */
+  .pitfall-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:18px;
+  }
+  .pitfall-card{
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:20px;
+  }
+  .pitfall-card .p-head{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;
+  }
+  .pitfall-card h3{
+    margin:0; font-size:16px; color:var(--ink); font-weight:700;
+  }
+  .p-badge{
+    font-size:10px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:3px 8px; border-radius:20px; font-weight:600;
+    background:rgba(255,255,255,0.06); color:var(--ink-dim);
+  }
+  .p-badge.current{ background:rgba(255,63,143,0.16); color:var(--magenta); }
+  .pitfall-note{
+    font-size:12.5px; color:var(--ink-dim); margin-top:12px; line-height:1.55;
+  }
+  .pitfall-note b{color:var(--ink);}
+
+  /* ---------- HOUR HEATMAP ---------- */
+  .heatmap-card{overflow-x:auto;}
+  .heatmap{
+    display:grid;
+    border-collapse:collapse;
+    min-width:520px;
+  }
+  .heatmap .hm-corner, .heatmap .hm-colhead{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--ink-faint); padding:8px 10px; text-align:center;
+    border-bottom:1px solid var(--hairline);
+  }
+  .heatmap .hm-rowhead{
+    font-size:12px; color:var(--ink-dim); padding:8px 12px;
+    white-space:nowrap; border-right:1px solid var(--hairline);
+    display:flex; align-items:center;
+  }
+  .heatmap .hm-cell{
+    padding:8px 6px; text-align:center; font-size:11.5px;
+    border-bottom:1px solid rgba(53,42,72,0.4);
+    color:#150f22; font-weight:600;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:44px;
+  }
+  .heatmap .hm-cell .n{ font-size:9px; font-weight:400; opacity:0.75; margin-top:1px; }
+  .heatmap .hm-cell.empty{ background:transparent !important; color:var(--ink-faint); font-weight:400; }
+
+  /* ---------- SESSION TABLE ---------- */
+  .session-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .session-table th{
+    text-align:left; font-weight:600; color:var(--ink-faint);
+    text-transform:uppercase; font-size:10.5px; letter-spacing:0.06em;
+    padding:10px 12px; border-bottom:1px solid var(--hairline);
+  }
+  .session-table td{
+    padding:12px; border-bottom:1px solid var(--hairline);
+    color:var(--ink-dim);
+  }
+  .session-table tr:hover td{background:rgba(255,255,255,0.02); color:var(--ink);}
+  .session-table td.num, .session-table th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  .phase-pill{
+    display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .phase-pill.p2{background:rgba(255,63,143,0.14); color:var(--magenta);}
+  .phase-pill.p3{background:rgba(139,107,255,0.16); color:var(--violet);}
+
+  footer{
+    padding:40px 0 60px;
+    color:var(--ink-faint);
+    font-size:11.5px;
+    border-top:1px solid var(--hairline);
+  }
+
+  @media (max-width: 860px){
+    .hero-grid{grid-template-columns:1fr; gap:20px;}
+    .hero-stat{text-align:left;}
+    .kpi-strip{grid-template-columns:repeat(3,1fr);}
+    .kpi:nth-child(3){border-right:none;}
+    .kpi{border-bottom:1px solid var(--hairline);}
+    .pitfall-grid{grid-template-columns:1fr;}
+    .session-table{font-size:11px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .rail-fill{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">Dancing Mad (Ultimate) · Progression Log</div>
+    <div class="hero-grid">
+      <div>
+        <h1>Still standing<br>between us <em>and Kefka</em>.</h1>
+        <p id="hero-copy">Loading raid log…</p>
+      </div>
+      <div class="hero-stat">
+        <span class="num" id="hero-num">—<sup>%</sup></span>
+        <div class="cap">boss hp remaining · current wall</div>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label-row">
+        <span>100% — pull starts</span>
+        <span>0% — clear</span>
+      </div>
+      <div class="rail">
+        <div class="rail-track"></div>
+        <div class="rail-fill" id="rail-fill" style="--pct:0%"></div>
+        <div class="rail-marker" id="rail-marker" style="--pct:0%" data-label=""></div>
+      </div>
+      <div class="rail-ticks">
+        <span>P1</span><span>P2</span><span>P3</span><span>P4</span><span>P5 · Ultima Kefka</span>
+      </div>
+      <div class="rail-phases" id="rail-phases"></div>
+    </div>
+  </section>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip" id="kpi-strip"></div>
+
+  <!-- PROGRESS PER RAID -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Fight progress, per raid night</h2>
+      <span class="tag">Phase reached · pull composition</span>
+    </div>
+    <p class="block-desc">Each bar is one raid night, split by how far pulls that night got. As phase&nbsp;1 shrinks and phase&nbsp;3 grows, the group is spending less time re-clearing old ground and more time on the current wall. The line tracks the single best pull (lowest boss HP%) of the night.</p>
+    <div class="chart-card">
+      <canvas id="chart-progress" height="170"></canvas>
+    </div>
+  </section>
+
+  <!-- PULL STATS -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Pull stats, per raid night</h2>
+      <span class="tag">Volume · duration</span>
+    </div>
+    <p class="block-desc">Pull count per night (bars) against average pull length in seconds (line). Fewer, longer pulls is the expected shape as prog gets deeper — each attempt survives further before dying.</p>
+    <div class="chart-card">
+      <canvas id="chart-pulls" height="160"></canvas>
+    </div>
+  </section>
+
+  <!-- PITFALLS -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Pitfalls — where pulls end</h2>
+      <span class="tag">Wall detection by phase</span>
+    </div>
+    <p class="block-desc">Distribution of boss HP% at time of death, grouped by the phase each pull reached. A tall bar means many pulls die at almost exactly the same HP — usually a specific mechanic, not bad luck.</p>
+    <div class="pitfall-grid" id="pitfall-grid"></div>
+  </section>
+
+  <!-- HOUR BY HOUR -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Hour-by-hour pull performance</h2>
+      <span class="tag">20:00–23:00 CEST · aggregated + per raid night</span>
+    </div>
+    <p class="block-desc">The static raids a fixed 20:00–23:00 CEST block. Bars below are grouped by actual clock hour (not UTC, not "hour into session"), aggregated across all 14 nights.</p>
+    <div class="chart-card">
+      <canvas id="chart-hourly" height="150"></canvas>
+    </div>
+
+    <p class="block-desc" style="margin-top:36px;">Same data broken out per raid night: each cell is the average boss HP% remaining for pulls started in that clock hour. Darker / cooler = deeper progress that hour, lighter / warmer = pulls stayed shallow. Blank = no pulls that hour.</p>
+    <div class="chart-card heatmap-card">
+      <div id="hour-heatmap"></div>
+    </div>
+  </section>
+
+  <!-- SESSION LOG -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Raid night log</h2>
+      <span class="tag">All 14 sessions</span>
+    </div>
+    <p class="block-desc">Full breakdown of every logged raid night, chronologically.</p>
+    <div class="chart-card" style="padding:6px 10px;">
+      <table class="session-table" id="session-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="num">Hours</th>
+            <th class="num">Pulls</th>
+            <th class="num">Pulls/hr</th>
+            <th>Furthest phase</th>
+            <th class="num">Best HP% left</th>
+            <th class="num">Avg pull length</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    __DATE_RANGE__ · Data pulled from FFLogs via the public v2 API · __RESET_NOTE__
+  </footer>
+
+</div>
+
+<script>
+const DATA = __DATA_JSON__;
+</script>
+<script>
+(function(){
+  const PHASE_COLOR = { 1: '#ffc73f', 2: '#ff3f8f', 3: '#8b6bff', 4: '#57e0d0', 5: '#ff7a3f', 0: '#4a4160' };
+  const PHASE_COLOR_DIM = { 1: 'rgba(255,199,63,0.55)', 2: 'rgba(255,63,143,0.55)', 3: 'rgba(139,107,255,0.55)', 4: 'rgba(87,224,208,0.55)', 5: 'rgba(255,122,63,0.55)', 0: 'rgba(74,65,96,0.55)' };
+  const PHASE_NAMES = { 0: 'Reset', 1: 'Phase 1 · Kefka', 2: 'Phase 2 · God Kefka', 3: 'Phase 3 · Exdeath & Chaos', 4: 'Phase 4 · Kefka Says', 5: 'Phase 5 · Ultima Kefka' };
+
+  const ov = DATA.overview;
+  const sessions = DATA.sessions;
+  const phaseComp = DATA.phase_composition;
+  const phaseStats = DATA.phase_stats;
+  const posStats = DATA.position_stats;
+
+  // ---- Chart.js global defaults to match theme ----
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#9c8fb8';
+  Chart.defaults.borderColor = '#352a48';
+
+  // ---- HERO ----
+  document.getElementById('hero-num').innerHTML = ov.current_best_pct + '<sup>%</sup>';
+  document.getElementById('hero-copy').textContent =
+    `${ov.total_pulls} pulls across ${ov.total_sessions} raid nights (${ov.total_hours} hours logged) between ${fmtDate(ov.date_start)} and ${fmtDate(ov.date_end)}. ` +
+    `Furthest reached: Phase ${ov.furthest_phase_reached} of 5. Kills so far: ${ov.total_kills}.`;
+
+  // ---- HP RAIL ----
+  const pct = ov.current_best_pct;
+  document.getElementById('rail-fill').style.setProperty('--pct', (100-pct) + '%');
+  const marker = document.getElementById('rail-marker');
+  marker.style.setProperty('--pct', (100-pct) + '%');
+  marker.setAttribute('data-label', pct + '% — current wall');
+
+  const ALL_PHASE_LABELS = {
+    1: 'Phase 1 · Kefka', 2: 'Phase 2 · God Kefka', 3: 'Phase 3 · Exdeath & Chaos',
+    4: 'Phase 4 · Kefka Says', 5: 'Phase 5 · Ultima Kefka'
+  };
+  const RAIL_PHASE_COLOR = { 1:'#ffc73f', 2:'#ff3f8f', 3:'#8b6bff', 4:'#57e0d0', 5:'#ff7a3f' };
+  const furthest = ov.furthest_phase_reached;
+  const phaseLegend = [];
+  for (let p = 1; p <= 5; p++) {
+    if (p < furthest) phaseLegend.push({label: ALL_PHASE_LABELS[p], color: RAIL_PHASE_COLOR[p]});
+    else if (p === furthest) phaseLegend.push({label: ALL_PHASE_LABELS[p] + ' (current)', color: RAIL_PHASE_COLOR[p]});
+  }
+  if (furthest < 5) {
+    const remaining = furthest === 4 ? 'Phase 5' : `Phase ${furthest+1}\u20135`;
+    phaseLegend.push({label: `${remaining} · unseen`, color: '#4a4160'});
+  }
+  document.getElementById('rail-phases').innerHTML = phaseLegend.map(p =>
+    `<span class="rail-phase-tag"><span class="swatch" style="background:${p.color}"></span>${p.label}</span>`
+  ).join('');
+
+  // ---- KPI STRIP ----
+  const kpis = [
+    { val: ov.total_pulls, lbl: 'Total pulls' },
+    { val: ov.total_sessions, lbl: 'Raid nights' },
+    { val: ov.total_hours + 'h', lbl: 'Hours logged' },
+    { val: ov.furthest_phase_reached + ' / 5', lbl: 'Furthest phase' },
+    { val: ov.total_kills, lbl: 'Kills' },
+    { val: ov.reset_pulls, lbl: 'Practice / reset pulls' },
+  ];
+  document.getElementById('kpi-strip').innerHTML = kpis.map(k =>
+    `<div class="kpi"><span class="val">${k.val}</span><div class="lbl">${k.lbl}</div></div>`
+  ).join('');
+
+  // ---- PROGRESS CHART (stacked bar + best% line) ----
+  const dates = phaseComp.map(d => fmtDateShort(d.date));
+  // Discover which phase keys are present across all nights (p0_reset, p1, p2, ...)
+  const phaseKeys = Object.keys(phaseComp[0] || {})
+    .filter(k => k !== 'date')
+    .sort((a,b) => {
+      const na = a === 'p0_reset' ? -1 : parseInt(a.replace('p',''),10);
+      const nb = b === 'p0_reset' ? -1 : parseInt(b.replace('p',''),10);
+      return na - nb;
+    });
+  const phaseDatasets = phaseKeys.map(key => {
+    const phaseNum = key === 'p0_reset' ? 0 : parseInt(key.replace('p',''),10);
+    return {
+      type:'bar',
+      label: PHASE_NAMES[phaseNum] || key,
+      data: phaseComp.map(d => d[key] || 0),
+      backgroundColor: PHASE_COLOR_DIM[phaseNum] || 'rgba(255,255,255,0.3)',
+      stack:'s'
+    };
+  });
+  new Chart(document.getElementById('chart-progress'), {
+    data: {
+      labels: dates,
+      datasets: [
+        ...phaseDatasets,
+        {
+          type:'line', label:'Best HP% left that night',
+          data: sessions.map(s=>s.best_pct_remaining_of_day),
+          borderColor:'#f1ecf8', backgroundColor:'#f1ecf8',
+          yAxisID:'y1', tension:.3, pointRadius:3, pointBackgroundColor:'#f1ecf8', borderWidth:2,
+        }
+      ]
+    },
+    options: {
+      responsive:true,
+      interaction:{mode:'index', intersect:false},
+      scales:{
+        x:{ stacked:true, grid:{display:false} },
+        y:{ stacked:true, title:{display:true, text:'Pulls', color:'#6c6087'}, grid:{color:'#241b30'} },
+        y1:{ position:'right', min:0, max:100, reverse:false, title:{display:true, text:'Best HP% left', color:'#6c6087'}, grid:{display:false} },
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
+    }
+  });
+
+  // ---- PULLS & DURATION CHART ----
+  new Chart(document.getElementById('chart-pulls'), {
+    data:{
+      labels: sessions.map(s=>fmtDateShort(s.date)),
+      datasets:[
+        { type:'bar', label:'Pulls', data: sessions.map(s=>s.total_pulls), backgroundColor:'rgba(255,63,143,0.45)', borderRadius:3 },
+        { type:'line', label:'Avg pull length (sec)', data: sessions.map(s=>s.avg_pull_duration_seconds),
+          borderColor:'#ffc73f', backgroundColor:'#ffc73f', yAxisID:'y1', tension:.3, pointRadius:3, borderWidth:2 }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{ grid:{display:false} },
+        y:{ title:{display:true, text:'Pulls', color:'#6c6087'}, grid:{color:'#241b30'} },
+        y1:{ position:'right', title:{display:true, text:'Seconds', color:'#6c6087'}, grid:{display:false} },
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
+    }
+  });
+
+  // ---- HOURLY / CEST CHART ----
+  const hc = DATA.hourly_cest;
+  new Chart(document.getElementById('chart-hourly'), {
+    data:{
+      labels: hc.aggregated.map(a=>a.label),
+      datasets:[
+        { type:'bar', label:'Avg pulls per night', data: hc.aggregated.map(a=>a.avg_pulls_per_night), backgroundColor:'rgba(139,107,255,0.5)', borderRadius:3, yAxisID:'y' },
+        { type:'line', label:'Avg HP% remaining', data: hc.aggregated.map(a=>a.avg_pct), borderColor:'#ffc73f', backgroundColor:'#ffc73f', yAxisID:'y1', tension:.3, pointRadius:4, borderWidth:2 }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{ grid:{display:false} },
+        y:{ title:{display:true, text:'Avg pulls / night', color:'#6c6087'}, grid:{color:'#241b30'} },
+        y1:{ position:'right', min:0, max:100, title:{display:true, text:'Avg HP% remaining', color:'#6c6087'}, grid:{display:false} },
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
+    }
+  });
+
+  // ---- HOUR-BY-NIGHT HEATMAP ----
+  (function(){
+    const cols = hc.bucket_order;
+    const labels = hc.bucket_labels;
+    // color scale: interpolate between violet (deep progress, low %) and gold (shallow, high %)
+    function cellColor(pct){
+      if (pct == null) return null;
+      const t = Math.max(0, Math.min(1, (pct - 45) / (100 - 45))); // 45%->violet, 100%->gold
+      const lo = [139,107,255]; // violet = deep progress
+      const hi = [255,199,63];  // gold = shallow
+      const c = lo.map((v,i)=> Math.round(v + (hi[i]-v)*t));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+    const container = document.getElementById('hour-heatmap');
+    const grid = document.createElement('div');
+    grid.className = 'heatmap';
+    grid.style.gridTemplateColumns = `140px repeat(${cols.length}, 1fr)`;
+
+    grid.appendChild(el('div','hm-corner',''));
+    cols.forEach(c => grid.appendChild(el('div','hm-colhead', labels[c])));
+
+    hc.grid.forEach(row => {
+      grid.appendChild(el('div','hm-rowhead', fmtDate(row.date)));
+      cols.forEach(c => {
+        const cell = row.hours[c];
+        const div = document.createElement('div');
+        if (!cell) {
+          div.className = 'hm-cell empty';
+          div.textContent = '–';
+        } else {
+          div.className = 'hm-cell';
+          const color = cellColor(cell.avg_pct);
+          div.style.background = color || 'rgba(255,255,255,0.05)';
+          div.innerHTML = (cell.avg_pct != null ? cell.avg_pct + '%' : '–') + `<span class="n">${cell.pull_count} pulls</span>`;
+        }
+        grid.appendChild(div);
+      });
+    });
+
+    container.appendChild(grid);
+
+    function el(cls, text, content){
+      const d = document.createElement('div');
+      d.className = cls;
+      if (content !== undefined) d.textContent = content;
+      return d;
+    }
+  })();
+
+
+  // ---- PITFALLS ----
+  const phaseNames = PHASE_NAMES;
+  const presentPhases = Object.keys(phaseStats).map(Number);
+  const maxPhase = Math.max(...presentPhases);
+  const phaseStatus = {};
+  presentPhases.forEach(p => { phaseStatus[p] = (p === maxPhase) ? 'current' : 'cleared'; });
+  const grid = document.getElementById('pitfall-grid');
+  Object.keys(phaseStats).sort().forEach(ph => {
+    const stat = phaseStats[ph];
+    const isCurrent = phaseStatus[ph] === 'current';
+    const card = document.createElement('div');
+    card.className = 'pitfall-card';
+    const canvasId = 'hist-' + ph;
+    card.innerHTML = `
+      <div class="p-head">
+        <h3>${phaseNames[ph]}</h3>
+        <span class="p-badge ${isCurrent ? 'current' : ''}">${isCurrent ? 'current wall' : 'passed'}</span>
+      </div>
+      <canvas id="${canvasId}" height="220"></canvas>
+      <div class="pitfall-note">${stat.n} pulls ended here. Most common: <b>${stat.wall_bucket.range}%</b> HP remaining (${stat.wall_bucket.count} pulls, ${Math.round(stat.wall_bucket.count/stat.n*100)}%).</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  Object.keys(phaseStats).sort().forEach(ph => {
+    const stat = phaseStats[ph];
+    const color = PHASE_COLOR[ph];
+    new Chart(document.getElementById('hist-' + ph), {
+      type:'bar',
+      data:{
+        labels: stat.histogram.map(h=>h.range),
+        datasets:[{
+          data: stat.histogram.map(h=>h.count),
+          backgroundColor: stat.histogram.map(h => h.range === stat.wall_bucket.range ? color : 'rgba(255,255,255,0.08)'),
+          borderRadius:3,
+        }]
+      },
+      options:{
+        responsive:true,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{title: (items)=> items[0].label + '% HP remaining'}} },
+        scales:{
+          x:{ grid:{display:false}, ticks:{font:{size:9}} },
+          y:{ grid:{color:'#241b30'}, ticks:{precision:0} }
+        }
+      }
+    });
+  });
+
+  // ---- SESSION TABLE ----
+  const tbody = document.querySelector('#session-table tbody');
+  tbody.innerHTML = sessions.map(s => `
+    <tr>
+      <td>${fmtDate(s.date)}</td>
+      <td class="num">${s.session_hours}</td>
+      <td class="num">${s.total_pulls}</td>
+      <td class="num">${s.pulls_per_hour}</td>
+      <td><span class="phase-pill p${s.furthest_phase}">Phase ${s.furthest_phase}</span></td>
+      <td class="num">${s.best_pct_remaining_of_day}%</td>
+      <td class="num">${s.avg_pull_duration_seconds}s</td>
+    </tr>
+  `).join('');
+
+  // ---- footer ----
+  function fmtDate(d){
+    const dt = new Date(d + 'T00:00:00Z');
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone:'UTC' });
+  }
+  function fmtDateShort(d){
+    const dt = new Date(d + 'T00:00:00Z');
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', timeZone:'UTC' });
+  }
+})();
+</script>
+</body>
+</html>
