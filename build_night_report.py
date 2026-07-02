@@ -251,27 +251,10 @@ def compute_context(full_df: pd.DataFrame, night_overview: dict, target_date: st
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--pulls-csv", type=str, default="./dmu_data/pulls.csv",
-                         help="Path to pulls.csv from main.py")
-    parser.add_argument("--date", type=str, default=None,
-                         help="Raid night to analyze (YYYY-MM-DD). Defaults to "
-                              "the most recent night present in pulls.csv.")
-    parser.add_argument("--template", type=str, default="night_report_template.html",
-                         help="Path to the HTML template file")
-    parser.add_argument("--out", type=str, default="dmu_night_report.html",
-                         help="Path to write the built report HTML")
-    add_raid_time_args(parser)
-    parser.add_argument("--break-threshold-min", type=float, default=10,
-                         help="Gaps at least this many minutes long count as "
-                              "scheduled breaks rather than wipe recovery, "
-                              "default 10")
-    args = parser.parse_args()
-
-    df = load_pulls(Path(args.pulls_csv))
-    target_date, night_df = select_night(df, args.date)
+def build_one_night(df: pd.DataFrame, target_date: str, args, out_path: Path) -> dict:
+    """Compute and write the report for one raid night. Returns the night
+    overview dict (used by callers that build multiple nights in one run)."""
+    night_df = df[df["date"] == target_date].sort_values("start_time_utc").reset_index(drop=True)
 
     night = compute_night_overview(night_df)
     pull_timeline = compute_pull_timeline(night_df)
@@ -292,14 +275,57 @@ def main():
         "phase_stats": compute_phase_stats(real_night),
     }
 
-    inject_template(Path(args.template), Path(args.out), {
+    inject_template(Path(args.template), out_path, {
         "__DATA_JSON__": json.dumps(data, separators=(",", ":")),
         "__DATE_RANGE__": target_date,
     })
 
-    print(f"Built night report: {args.out}")
+    print(f"Built night report: {out_path}")
     print(f"  {target_date} — {night['total_pulls']} pulls, best {night['best_pct_remaining']}% "
           f"(phase {night['furthest_phase']}), trend: {trend['direction']}")
+    return night
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--pulls-csv", type=str, default="./dmu_data/pulls.csv",
+                         help="Path to pulls.csv from main.py")
+    parser.add_argument("--date", type=str, default=None,
+                         help="Raid night to analyze (YYYY-MM-DD). Defaults to "
+                              "the most recent night present in pulls.csv. "
+                              "Ignored if --all-nights is set.")
+    parser.add_argument("--all-nights", action="store_true",
+                         help="Build one report per raid night present in "
+                              "pulls.csv, instead of just one night. Each "
+                              "report is written to '<out-dir>/<date>.html'.")
+    parser.add_argument("--out-dir", type=str, default=".",
+                         help="Directory to write per-night reports into "
+                              "when --all-nights is set (default: current "
+                              "directory)")
+    parser.add_argument("--template", type=str, default="night_report_template.html",
+                         help="Path to the HTML template file")
+    parser.add_argument("--out", type=str, default="dmu_night_report.html",
+                         help="Path to write the built report HTML "
+                              "(single-night mode only)")
+    add_raid_time_args(parser)
+    parser.add_argument("--break-threshold-min", type=float, default=10,
+                         help="Gaps at least this many minutes long count as "
+                              "scheduled breaks rather than wipe recovery, "
+                              "default 10")
+    args = parser.parse_args()
+
+    df = load_pulls(Path(args.pulls_csv))
+
+    if args.all_nights:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for target_date in all_nights(df):
+            build_one_night(df, target_date, args, out_dir / f"{target_date}.html")
+        return
+
+    target_date, _ = select_night(df, args.date)
+    build_one_night(df, target_date, args, Path(args.out))
 
 
 if __name__ == "__main__":

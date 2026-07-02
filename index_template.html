@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dancing Mad (Ultimate) — Raid Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500;1,9..144,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Styling is intentionally duplicated from dashboard_template.html / night_report_template.html
+     (same theme). If you change the palette/fonts there, mirror the change here.
+     No Chart.js here — this page has no charts, just a links table. -->
+<style>
+  :root{
+    --bg: #120e1a;
+    --bg-panel: #1a1424;
+    --bg-panel-2: #221a30;
+    --hairline: #352a48;
+    --ink: #f1ecf8;
+    --ink-dim: #9c8fb8;
+    --ink-faint: #6c6087;
+    --magenta: #ff3f8f;
+    --magenta-dim: #c72e6f;
+    --gold: #ffc73f;
+    --gold-dim: #d1a230;
+    --violet: #8b6bff;
+    --grey: #4a4160;
+    --good: #6ee7b7;
+    --bad: #ff6b6b;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,63,143,0.10), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(139,107,255,0.08), transparent),
+      var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3, .display{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+
+  a{color:var(--gold); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+
+  .wrap{max-width:1100px; margin:0 auto; padding:0 28px;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    padding:76px 0 40px;
+    border-bottom:1px solid var(--hairline);
+    position:relative;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--magenta);
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px; height:1px;
+    background:var(--magenta);
+    display:inline-block;
+  }
+  .hero h1{
+    font-size:clamp(36px, 5.5vw, 60px);
+    line-height:1.02;
+    margin:0 0 18px;
+    color:var(--ink);
+  }
+  .hero p{
+    color:var(--ink-dim);
+    font-size:15px;
+    max-width:64ch;
+    margin:0;
+  }
+  .hero-links{
+    margin-top:28px;
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .hero-links a{
+    display:inline-block;
+    font-size:12.5px; letter-spacing:0.04em; font-weight:600;
+    padding:12px 20px; border-radius:8px;
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    color:var(--ink);
+  }
+  .hero-links a:hover{
+    border-color:var(--magenta);
+    color:var(--magenta);
+    text-decoration:none;
+  }
+
+  /* ---------- SECTIONS ---------- */
+  section.block{padding:56px 0;}
+  .block-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px; flex-wrap:wrap; gap:10px;
+  }
+  .block-head h2{font-size:24px; margin:0; color:var(--ink);}
+  .block-head .tag{
+    font-size:11px; color:var(--ink-faint); letter-spacing:0.06em; text-transform:uppercase;
+  }
+  .block-desc{color:var(--ink-dim); font-size:13.5px; max-width:70ch; margin:0 0 28px;}
+
+  /* ---------- NIGHTS TABLE ---------- */
+  .nights-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .nights-table th{
+    text-align:left; font-weight:600; color:var(--ink-faint);
+    text-transform:uppercase; font-size:10.5px; letter-spacing:0.06em;
+    padding:10px 12px; border-bottom:1px solid var(--hairline);
+  }
+  .nights-table td{
+    padding:14px 12px; border-bottom:1px solid var(--hairline);
+    color:var(--ink-dim);
+  }
+  .nights-table tr:hover td{background:rgba(255,255,255,0.02); color:var(--ink);}
+  .nights-table td.num, .nights-table th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  .nights-table tr.kill td{background:rgba(110,231,183,0.06);}
+  .nights-table a.night-link{color:var(--ink); font-weight:600;}
+  .nights-table a.night-link:hover{color:var(--magenta);}
+  .phase-pill{
+    display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .phase-pill.p1{background:rgba(255,199,63,0.14); color:var(--gold);}
+  .phase-pill.p2{background:rgba(255,63,143,0.14); color:var(--magenta);}
+  .phase-pill.p3{background:rgba(139,107,255,0.16); color:var(--violet);}
+  .phase-pill.p4{background:rgba(87,224,208,0.16); color:#57e0d0;}
+  .phase-pill.p5{background:rgba(255,122,63,0.16); color:#ff7a3f;}
+  .phase-pill.p0{background:rgba(74,65,96,0.3); color:var(--ink-faint);}
+  .kill-pill{
+    display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+    background:rgba(110,231,183,0.16); color:var(--good);
+  }
+  .empty-note{color:var(--ink-faint); font-size:13px; padding:24px 0;}
+
+  footer{
+    padding:40px 0 60px;
+    color:var(--ink-faint);
+    font-size:11.5px;
+    border-top:1px solid var(--hairline);
+  }
+
+  @media (max-width: 860px){
+    .nights-table{font-size:11px;}
+    .nights-table td, .nights-table th{padding:10px 8px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">Dancing Mad (Ultimate) · Raid Progress</div>
+    <h1>Raid night reports</h1>
+    <p>Every raid night's pull-by-pull report, plus the full cross-night progression dashboard. Data pulled from FFLogs and rebuilt automatically after each raid night.</p>
+    <div class="hero-links">
+      <a href="dashboard.html">Full progression dashboard →</a>
+    </div>
+  </section>
+
+  <!-- NIGHTS LIST -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Raid nights</h2>
+      <span class="tag" id="nights-tag">—</span>
+    </div>
+    <p class="block-desc">Newest first. Click a night for its full pull-by-pull breakdown, downtime, trend, and how it compared to the all-time best at the time.</p>
+    <div id="nights-container"></div>
+  </section>
+
+  <footer>
+    __DATE_RANGE__ · Data pulled from FFLogs via the public v2 API · Last built __GENERATED_AT__
+  </footer>
+
+</div>
+
+<script>
+const NIGHTS = __NIGHTS_JSON__;
+const NIGHTS_DIR = "__NIGHTS_DIR__";
+</script>
+<script>
+(function(){
+  const tag = document.getElementById('nights-tag');
+  const container = document.getElementById('nights-container');
+
+  if (!NIGHTS.length) {
+    tag.textContent = 'No raid nights yet';
+    container.innerHTML = '<p class="empty-note">No raid nights logged yet. Check back after the first raid night.</p>';
+    return;
+  }
+
+  tag.textContent = NIGHTS.length + (NIGHTS.length === 1 ? ' night' : ' nights') + ' logged';
+
+  const nights = NIGHTS.slice().reverse(); // newest first
+
+  const rows = nights.map(n => {
+    const phasePill = `<span class="phase-pill p${n.furthest_phase ?? 0}">Phase ${n.furthest_phase ?? '—'}</span>`;
+    const killPill = n.kills > 0 ? '<span class="kill-pill">Kill</span>' : '';
+    const best = n.best_pct_remaining != null ? n.best_pct_remaining.toFixed(2) + '%' : '—';
+    return `<tr class="${n.kills > 0 ? 'kill' : ''}">
+      <td><a class="night-link" href="${NIGHTS_DIR}/${n.date}.html">${n.date}</a></td>
+      <td class="num">${n.total_pulls}</td>
+      <td class="num">${n.kills}</td>
+      <td class="num">${best}</td>
+      <td>${phasePill} ${killPill}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<table class="nights-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th class="num">Pulls</th>
+        <th class="num">Kills</th>
+        <th class="num">Best HP% left</th>
+        <th>Furthest phase</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+})();
+</script>
+</body>
+</html>

@@ -14,8 +14,11 @@ single-night deep-dive report.
 | `dmu_common.py` | Shared data logic imported by both build scripts |
 | `build_dashboard.py` | Turns `pulls.csv` into the full-history HTML dashboard |
 | `dashboard_template.html` | Visual shell used by `build_dashboard.py` — keep it alongside the script |
-| `build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night |
+| `build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night (or every night, with `--all-nights`) |
 | `night_report_template.html` | Visual shell used by `build_night_report.py` — keep it alongside the script |
+| `build_index.py` | Builds a landing page listing every raid night, linking to its report and to the full dashboard |
+| `index_template.html` | Visual shell used by `build_index.py` — keep it alongside the script |
+| `.github/workflows/nightly.yml` | Scheduled CI: fetch + build all reports + deploy to GitHub Pages (see [Automated nightly builds](#automated-nightly-builds)) |
 | `pyproject.toml` | Python dependencies (managed with `uv`) |
 
 It talks to FFLogs' public API (v2, GraphQL) using the OAuth **client
@@ -172,6 +175,43 @@ between them, and running one doesn't require the other.
 **Keep the template files next to their build scripts** — they're the
 visual shells the scripts inject data into. Editing a template restyles a
 report without touching the data logic at all.
+
+---
+
+## Automated nightly builds
+
+A GitHub Actions workflow (`.github/workflows/nightly.yml`) runs the whole
+pipeline on a schedule (05:00 UTC by default — after the CEST/CET
+20:00–23:00 raid block) and publishes the results to GitHub Pages:
+
+1. Fetches the latest FFLogs data (`main.py`) and commits the updated
+   `dmu_data/pulls.csv` / `dmu_data/reports_raw.json` back to `main` — these
+   files are tracked in git specifically so the incremental fetch cache
+   persists between scheduled runs (only new/changed reports hit the API).
+2. Builds the full-history dashboard, one report per raid night
+   (`build_night_report.py --all-nights`), and a new landing page
+   (`build_index.py`) listing every night with a link to its report and to
+   the full dashboard.
+3. Deploys the built `site/` directory to GitHub Pages.
+
+The workflow can also be triggered manually from the Actions tab
+(`workflow_dispatch`) to test or force a rebuild outside the schedule.
+
+One-time setup for this to work:
+
+- Add `FFLOGS_CLIENT_ID` / `FFLOGS_CLIENT_SECRET` as repo secrets (Settings
+  → Secrets and variables → Actions) — same values as your local `.env`.
+- Set repo Settings → Pages → Source to **"GitHub Actions"** (not "Deploy
+  from a branch").
+
+The generated `site/` directory (built fresh on every run) is gitignored —
+it's never committed to `main`, only uploaded as a Pages deployment
+artifact, so nightly rebuilds don't bloat the repo's history the way
+committing rebuilt HTML every night would.
+
+`build_night_report.py --all-nights --out-dir <dir>` builds every raid
+night present in `pulls.csv` to `<dir>/<date>.html` instead of just the
+latest one; `--date`/`--out` still work as before for a single night.
 
 ---
 
