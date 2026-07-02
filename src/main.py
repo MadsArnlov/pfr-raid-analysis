@@ -9,15 +9,15 @@ SETUP
    - Name: whatever you like
    - Redirect URL: not needed for client-credentials, put http://localhost
 2. Copy the Client ID and Client Secret.
-3. Create a file called `.env` next to this script (NOT committed anywhere, NOT
+3. Create a file called `.env` in the repo root (NOT committed anywhere, NOT
    pasted into a chat) with:
 
        FFLOGS_CLIENT_ID=your_client_id
        FFLOGS_CLIENT_SECRET=your_client_secret
 
-4. Run:
+4. Run (from the repo root):
 
-       uv run main.py
+       uv run src/main.py
 
    Optional flags:
        --guild-id 102435                # numeric guild ID from the fflogs URL
@@ -336,9 +336,9 @@ def main():
     print(f"Wrote {len(pulls)} pulls to {csv_path}")
 
     print("\nDone. Build the dashboards with:\n"
-          "  uv run build_dashboard.py\n"
-          "  uv run build_night_report.py\n"
-          "or both at once with: uv run refresh.py")
+          "  uv run src/build_dashboard.py\n"
+          "  uv run src/build_night_report.py\n"
+          "or both at once with: uv run src/refresh.py")
 
 
 if __name__ == "__main__":

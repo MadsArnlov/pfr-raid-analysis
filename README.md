@@ -9,17 +9,21 @@ single-night deep-dive report.
 
 | File | Purpose |
 |---|---|
-| `main.py` | Pulls raw pull data from FFLogs → `pulls.csv` (incremental — only new/changed reports hit the API) |
-| `refresh.py` | One command: fetch + rebuild both HTML reports |
-| `dmu_common.py` | Shared data logic imported by both build scripts |
-| `build_dashboard.py` | Turns `pulls.csv` into the full-history HTML dashboard |
-| `dashboard_template.html` | Visual shell used by `build_dashboard.py` — keep it alongside the script |
-| `build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night (or every night, with `--all-nights`) |
-| `night_report_template.html` | Visual shell used by `build_night_report.py` — keep it alongside the script |
-| `build_index.py` | Builds a landing page listing every raid night, linking to its report and to the full dashboard |
-| `index_template.html` | Visual shell used by `build_index.py` — keep it alongside the script |
+| `src/main.py` | Pulls raw pull data from FFLogs → `pulls.csv` (incremental — only new/changed reports hit the API) |
+| `src/refresh.py` | One command: fetch + rebuild both HTML reports |
+| `src/dmu_common.py` | Shared data logic imported by both build scripts |
+| `src/build_dashboard.py` | Turns `pulls.csv` into the full-history HTML dashboard |
+| `templates/dashboard_template.html` | Visual shell used by `build_dashboard.py` |
+| `src/build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night (or every night, with `--all-nights`) |
+| `templates/night_report_template.html` | Visual shell used by `build_night_report.py` |
+| `src/build_index.py` | Builds a landing page listing every raid night, linking to its report and to the full dashboard |
+| `templates/index_template.html` | Visual shell used by `build_index.py` |
+| `output/` | Default location for locally built HTML reports (`dmu_raid_dashboard.html`, `dmu_night_report.html`, per-night reports) |
 | `.github/workflows/nightly.yml` | Scheduled CI: fetch + build all reports + deploy to GitHub Pages (see [Automated nightly builds](#automated-nightly-builds)) |
 | `pyproject.toml` | Python dependencies (managed with `uv`) |
+
+All commands below are run from the repo root — scripts resolve their
+default `--pulls-csv` / `--template` / `--out` paths relative to it.
 
 It talks to FFLogs' public API (v2, GraphQL) using the OAuth **client
 credentials** flow — no login or password needed, just an API client ID and
@@ -49,7 +53,7 @@ If you ever lose the secret, go back to the client page and reset it.
 uv sync
 ```
 
-Create a file named `.env` in the same folder (do **not** share this file or
+Create a file named `.env` in the repo root (do **not** share this file or
 paste its contents anywhere):
 
 ```
@@ -64,21 +68,21 @@ FFLOGS_CLIENT_SECRET=your_client_secret_here
 The entire refresh loop after a raid night is one command:
 
 ```bash
-uv run refresh.py
+uv run src/refresh.py
 ```
 
-This fetches the latest logs and rebuilds both `dmu_raid_dashboard.html`
-(full history) and `dmu_night_report.html` (latest night). Open either in
-any browser. Use `--skip-fetch` to rebuild from the existing `pulls.csv`
+This fetches the latest logs and rebuilds both `output/dmu_raid_dashboard.html`
+(full history) and `output/dmu_night_report.html` (latest night). Open either
+in any browser. Use `--skip-fetch` to rebuild from the existing `pulls.csv`
 without hitting the API; other flags pass through to the build scripts.
 
 Each step is also runnable on its own:
 
 ```bash
-uv run main.py                                # fetch → dmu_data/pulls.csv
-uv run build_dashboard.py                     # → dmu_raid_dashboard.html
-uv run build_night_report.py                  # → dmu_night_report.html (latest night)
-uv run build_night_report.py --date 2026-06-24  # a specific past night
+uv run src/main.py                                # fetch → dmu_data/pulls.csv
+uv run src/build_dashboard.py                     # → output/dmu_raid_dashboard.html
+uv run src/build_night_report.py                  # → output/dmu_night_report.html (latest night)
+uv run src/build_night_report.py --date 2026-06-24  # a specific past night
 ```
 
 The guild ID defaults to this static's (102435). For another guild, pass
@@ -134,8 +138,8 @@ per-night log with wall reps and record-night markers.
 | Flag | Default | Purpose |
 |---|---|---|
 | `--pulls-csv` | `./dmu_data/pulls.csv` | Path to `pulls.csv` |
-| `--template` | `dashboard_template.html` | HTML template to inject data into |
-| `--out` | `dmu_raid_dashboard.html` | Output file path |
+| `--template` | `templates/dashboard_template.html` | HTML template to inject data into |
+| `--out` | `output/dmu_raid_dashboard.html` | Output file path |
 | `--utc-offset` | `2` | Hours added to UTC for local raid time (2 = CEST/summer, 1 = CET/winter) |
 | `--raid-start-hour` | `20` | Local hour your raid block starts (24h, e.g. 20 = 8pm) |
 | `--raid-length-hours` | `3` | Length of your raid block in hours |
@@ -145,7 +149,7 @@ per-night log with wall reps and record-night markers.
 Example for a winter (CET) raid night starting at 19:00 for 4 hours:
 
 ```bash
-uv run build_dashboard.py --utc-offset 1 --raid-start-hour 19 --raid-length-hours 4
+uv run src/build_dashboard.py --utc-offset 1 --raid-start-hour 19 --raid-length-hours 4
 ```
 
 The dashboard automatically adapts to further progress — the phase
@@ -164,15 +168,15 @@ how the night stacks up against the all-time best.
 |---|---|---|
 | `--pulls-csv` | `./dmu_data/pulls.csv` | Path to `pulls.csv` |
 | `--date` | most recent night | Raid night to analyze (`YYYY-MM-DD`) |
-| `--template` | `night_report_template.html` | HTML template to inject data into |
-| `--out` | `dmu_night_report.html` | Output file path |
+| `--template` | `templates/night_report_template.html` | HTML template to inject data into |
+| `--out` | `output/dmu_night_report.html` | Output file path |
 | `--utc-offset` / `--raid-start-hour` / `--raid-length-hours` | `2` / `20` / `3` | Same as the dashboard |
 | `--break-threshold-min` | `10` | Gaps at least this long count as scheduled breaks, not wipe recovery |
 
 Both reports read the same `pulls.csv` — there's nothing to keep in sync
 between them, and running one doesn't require the other.
 
-**Keep the template files next to their build scripts** — they're the
+**Templates live in `templates/`, build scripts in `src/`** — they're the
 visual shells the scripts inject data into. Editing a template restyles a
 report without touching the data logic at all.
 
@@ -184,14 +188,14 @@ A GitHub Actions workflow (`.github/workflows/nightly.yml`) runs the whole
 pipeline on a schedule (05:00 UTC by default — after the CEST/CET
 20:00–23:00 raid block) and publishes the results to GitHub Pages:
 
-1. Fetches the latest FFLogs data (`main.py`) and commits the updated
+1. Fetches the latest FFLogs data (`src/main.py`) and commits the updated
    `dmu_data/pulls.csv` / `dmu_data/reports_raw.json` back to `main` — these
    files are tracked in git specifically so the incremental fetch cache
    persists between scheduled runs (only new/changed reports hit the API).
 2. Builds the full-history dashboard, one report per raid night
-   (`build_night_report.py --all-nights`), and a new landing page
-   (`build_index.py`) listing every night with a link to its report and to
-   the full dashboard.
+   (`src/build_night_report.py --all-nights`), and a new landing page
+   (`src/build_index.py`) listing every night with a link to its report and
+   to the full dashboard.
 3. Deploys the built `site/` directory to GitHub Pages.
 
 The workflow can also be triggered manually from the Actions tab
@@ -209,7 +213,7 @@ it's never committed to `main`, only uploaded as a Pages deployment
 artifact, so nightly rebuilds don't bloat the repo's history the way
 committing rebuilt HTML every night would.
 
-`build_night_report.py --all-nights --out-dir <dir>` builds every raid
+`src/build_night_report.py --all-nights --out-dir <dir>` builds every raid
 night present in `pulls.csv` to `<dir>/<date>.html` instead of just the
 latest one; `--date`/`--out` still work as before for a single night.
 
@@ -238,5 +242,6 @@ latest one; `--date`/`--out` still work as before for a single night.
   for CEST (roughly late March–late October) and 1 for CET (winter). If your
   raid time isn't 20:00–23:00 local, also set `--raid-start-hour` /
   `--raid-length-hours` to match.
-- **A build script can't find its template** — make sure the template file
-  is in the same folder, or pass its path explicitly with `--template`.
+- **A build script can't find its template** — make sure you're running from
+  the repo root (default `--template` paths are `templates/...`), or pass
+  its path explicitly with `--template`.

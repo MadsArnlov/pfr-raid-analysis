@@ -10,11 +10,11 @@ once with refresh.py.
 
 USAGE
 -----
-    python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
+    python src/build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
 
 Optional flags:
-    --template ./dashboard_template.html   # HTML template to inject data into
-    --out ./dmu_raid_dashboard.html        # output file
+    --template ./templates/dashboard_template.html   # HTML template to inject data into
+    --out ./output/dmu_raid_dashboard.html           # output file
     --utc-offset 2                         # hours to add to UTC for local
                                             # raid time (2 = CEST/summer,
                                             # 1 = CET/winter)
@@ -169,9 +169,9 @@ def main():
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--pulls-csv", type=str, default="./dmu_data/pulls.csv",
                          help="Path to pulls.csv from main.py")
-    parser.add_argument("--template", type=str, default="dashboard_template.html",
+    parser.add_argument("--template", type=str, default="templates/dashboard_template.html",
                          help="Path to the HTML template file")
-    parser.add_argument("--out", type=str, default="dmu_raid_dashboard.html",
+    parser.add_argument("--out", type=str, default="output/dmu_raid_dashboard.html",
                          help="Path to write the built dashboard HTML")
     add_raid_time_args(parser)
     parser.add_argument("--wall-min-pulls-since-record", type=int, default=15,

@@ -25,7 +25,7 @@ jobs:
       - run: uv sync
 
       - name: Fetch latest FFLogs data
-        run: uv run main.py
+        run: uv run src/main.py
         env:
           FFLOGS_CLIENT_ID: ${{ secrets.FFLOGS_CLIENT_ID }}
           FFLOGS_CLIENT_SECRET: ${{ secrets.FFLOGS_CLIENT_SECRET }}
@@ -53,13 +53,13 @@ jobs:
       - run: mkdir -p site/nights
 
       - name: Build full-history dashboard
-        run: uv run build_dashboard.py --out site/dashboard.html
+        run: uv run src/build_dashboard.py --out site/dashboard.html
 
       - name: Build per-night reports
-        run: uv run build_night_report.py --all-nights --out-dir site/nights
+        run: uv run src/build_night_report.py --all-nights --out-dir site/nights
 
       - name: Build landing page
-        run: uv run build_index.py --out site/index.html --nights-dir nights
+        run: uv run src/build_index.py --out site/index.html --nights-dir nights
 
       - uses: actions/upload-pages-artifact@v3
         with:

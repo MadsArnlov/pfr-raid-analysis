@@ -19,13 +19,19 @@ night.
 ## How the pieces fit together
 
 ```
-FFLogs API  →  main.py  →  pulls.csv  →  build_dashboard.py     →  dmu_raid_dashboard.html
-                         →  reports_raw.json (raw backup + fetch cache)
-                            pulls.csv  →  build_night_report.py →  dmu_night_report.html
+FFLogs API  →  src/main.py  →  pulls.csv  →  src/build_dashboard.py     →  output/dmu_raid_dashboard.html
+                             →  reports_raw.json (raw backup + fetch cache)
+                                pulls.csv  →  src/build_night_report.py →  output/dmu_night_report.html
 
-refresh.py = main.py + both build scripts, in one command
-dmu_common.py = shared data logic imported by both build scripts
+src/refresh.py = src/main.py + both build scripts, in one command
+src/dmu_common.py = shared data logic imported by both build scripts
 ```
+
+Python build scripts live in `src/`, their HTML shells in `templates/`,
+and locally built HTML output goes to `output/` (gitignored except for the
+two artifacts described below). All commands are run from the repo
+root — every script's default paths (`--pulls-csv`, `--template`, `--out`)
+are relative to it, not to `src/`.
 
 There are two independent downstream builds off the same `pulls.csv`:
 `build_dashboard.py` for the full multi-night history, and
@@ -35,22 +41,23 @@ both start from a fresh `pulls.csv` fetch.
 
 | File | Role |
 |---|---|
-| `main.py` | Authenticates to FFLogs v2 GraphQL API (client-credentials flow), fetches all reports for the guild filtered to the DMU zone, flattens every pull into `pulls.csv`. Incremental: reports whose `endTime` is unchanged in `reports_raw.json` are reused from cache instead of refetched (`--full-refetch` bypasses this). |
-| `refresh.py` | One-command refresh: runs `main.py`, then both build scripts. `--skip-fetch` rebuilds from the existing `pulls.csv`; other args pass through to the builders. |
-| `dmu_common.py` | Shared logic used by both build scripts: pulls.csv loading/typing, "real pull" filtering, local-time hour bucketing, phase-to-phase conversion, the pitfalls histograms, and template injection. Anything both reports need belongs here, not copy-pasted. |
+| `src/main.py` | Authenticates to FFLogs v2 GraphQL API (client-credentials flow), fetches all reports for the guild filtered to the DMU zone, flattens every pull into `pulls.csv`. Incremental: reports whose `endTime` is unchanged in `reports_raw.json` are reused from cache instead of refetched (`--full-refetch` bypasses this). |
+| `src/refresh.py` | One-command refresh: runs `main.py`, then both build scripts. `--skip-fetch` rebuilds from the existing `pulls.csv`; other args pass through to the builders. |
+| `src/dmu_common.py` | Shared logic used by both build scripts: pulls.csv loading/typing, "real pull" filtering, local-time hour bucketing, phase-to-phase conversion, the pitfalls histograms, and template injection. Anything both reports need belongs here, not copy-pasted. |
 | `pulls.csv` | Source of truth. One row per pull: date/time, kill/wipe, `fight_percentage`, `boss_percentage`, `last_phase`, duration. Everything downstream is derived from this file alone. |
-| `build_dashboard.py` | Reads `pulls.csv`, computes all cross-night aggregates (session boundaries, prog curve, progression records/wall detection, phase histograms, hour-by-raid-night grid), injects them as JSON into `dashboard_template.html`, writes the final HTML. |
-| `dashboard_template.html` | The visual shell — HTML/CSS/Chart.js. Contains `__DATA_JSON__`, `__DATE_RANGE__`, `__RESET_NOTE__` placeholders that `build_dashboard.py` fills in. All data access in the JS reads from a single injected `DATA` object. |
-| `dmu_raid_dashboard.html` | Final build artifact of `build_dashboard.py`. Fully self-contained (Chart.js loaded from cdnjs, fonts from Google Fonts) — can be opened directly in a browser or hosted as a static file. |
-| `build_night_report.py` | Reads `pulls.csv`, filters to one raid night (latest, or `--date`), computes a pull-by-pull timeline plus trend/downtime (with break detection)/phase-composition for that night and an all-time-best comparison against the rest of `pulls.csv`, injects them into `night_report_template.html`. |
-| `night_report_template.html` | The visual shell for the single-night report — same theme/fonts/Chart.js as `dashboard_template.html` (CSS intentionally duplicated, not shared) but built around a pull-level timeline instead of cross-night aggregates. Same `__DATA_JSON__` / `__DATE_RANGE__` placeholder mechanism. |
-| `dmu_night_report.html` | Final build artifact of `build_night_report.py`. Self-contained the same way as `dmu_raid_dashboard.html`. |
+| `src/build_dashboard.py` | Reads `pulls.csv`, computes all cross-night aggregates (session boundaries, prog curve, progression records/wall detection, phase histograms, hour-by-raid-night grid), injects them as JSON into `templates/dashboard_template.html`, writes the final HTML. |
+| `templates/dashboard_template.html` | The visual shell — HTML/CSS/Chart.js. Contains `__DATA_JSON__`, `__DATE_RANGE__`, `__RESET_NOTE__` placeholders that `build_dashboard.py` fills in. All data access in the JS reads from a single injected `DATA` object. |
+| `output/dmu_raid_dashboard.html` | Final build artifact of `build_dashboard.py`. Fully self-contained (Chart.js loaded from cdnjs, fonts from Google Fonts) — can be opened directly in a browser or hosted as a static file. |
+| `src/build_night_report.py` | Reads `pulls.csv`, filters to one raid night (latest, or `--date`), computes a pull-by-pull timeline plus trend/downtime (with break detection)/phase-composition for that night and an all-time-best comparison against the rest of `pulls.csv`, injects them into `templates/night_report_template.html`. |
+| `templates/night_report_template.html` | The visual shell for the single-night report — same theme/fonts/Chart.js as `dashboard_template.html` (CSS intentionally duplicated, not shared) but built around a pull-level timeline instead of cross-night aggregates. Same `__DATA_JSON__` / `__DATE_RANGE__` placeholder mechanism. |
+| `output/dmu_night_report.html` | Final build artifact of `build_night_report.py`. Self-contained the same way as `dmu_raid_dashboard.html`. |
 
 **Rule of thumb:** styling and layout changes go in the relevant template
-file (`dashboard_template.html` or `night_report_template.html`).
-Data/aggregation changes go in the matching build script. Don't hand-edit
-`dmu_raid_dashboard.html` or `dmu_night_report.html` — they're generated
-artifacts and will be overwritten on the next build.
+file (`templates/dashboard_template.html` or
+`templates/night_report_template.html`). Data/aggregation changes go in the
+matching build script in `src/`. Don't hand-edit
+`output/dmu_raid_dashboard.html` or `output/dmu_night_report.html` — they're
+generated artifacts and will be overwritten on the next build.
 
 ## Domain knowledge specific to this project
 
@@ -124,15 +131,15 @@ uv sync
 # one-time: create an FFLogs API client at https://www.fflogs.com/api/clients/
 # and put FFLOGS_CLIENT_ID / FFLOGS_CLIENT_SECRET in a local .env file
 
-# the whole refresh loop (fetch + both reports):
-uv run refresh.py
+# the whole refresh loop (fetch + both reports), from the repo root:
+uv run src/refresh.py
 
 # or piecewise (guild id defaults to this static's, 102435):
-uv run main.py
-uv run build_dashboard.py
-uv run build_night_report.py
+uv run src/main.py
+uv run src/build_dashboard.py
+uv run src/build_night_report.py
 # a specific past night:
-uv run build_night_report.py --date 2026-06-24
+uv run src/build_night_report.py --date 2026-06-24
 ```
 
 The fetch is incremental — only reports that are new or changed since the
@@ -146,16 +153,17 @@ See `README.md` for full setup and flag documentation.
 - Python: stdlib + `requests`, `python-dotenv`, `pandas`. No other
   dependencies without a good reason — this is meant to stay a small,
   easy-to-audit pipeline.
-- Logic needed by both build scripts goes in `dmu_common.py`; don't
+- Logic needed by both build scripts goes in `src/dmu_common.py`; don't
   duplicate aggregation code between them.
-- No secrets in the repo. `.env` holding `FFLOGS_CLIENT_ID` /
+- No secrets in the repo. `.env` (repo root) holding `FFLOGS_CLIENT_ID` /
   `FFLOGS_CLIENT_SECRET` must stay out of version control (add to
   `.gitignore` if not already there).
-- `dashboard_template.html` has no build step — it's plain HTML/CSS/JS with
-  Chart.js from a CDN. Keep it that way; don't introduce a bundler or
-  framework for what's currently a single static file.
+- `templates/dashboard_template.html` has no build step — it's plain
+  HTML/CSS/JS with Chart.js from a CDN. Keep it that way; don't introduce a
+  bundler or framework for what's currently a single static file.
 - When adding new aggregate stats, add them to the `data` dict in
-  `build_dashboard.py` and consume them in `dashboard_template.html` via the
-  global `DATA` object — don't invent a second data-passing mechanism.
+  `src/build_dashboard.py` and consume them in
+  `templates/dashboard_template.html` via the global `DATA` object — don't
+  invent a second data-passing mechanism.
 - Prefer deriving new stats from `pulls.csv` alone over requiring additional
   input files, to keep the "two commands to refresh" workflow intact.

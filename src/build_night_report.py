@@ -15,13 +15,13 @@ logged. That's the only place this script looks outside the selected night.
 
 USAGE
 -----
-    python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
+    python src/build_night_report.py --pulls-csv ./dmu_data/pulls.csv
 
 Optional flags:
-    --date 2026-06-24                        # analyze a specific night
-                                              # instead of the most recent one
-    --template ./night_report_template.html  # HTML template to inject data into
-    --out ./dmu_night_report.html            # output file
+    --date 2026-06-24                                 # analyze a specific night
+                                                       # instead of the most recent one
+    --template ./templates/night_report_template.html  # HTML template to inject data into
+    --out ./output/dmu_night_report.html                # output file
     --utc-offset 2                           # hours to add to UTC for local
                                               # raid time (2 = CEST, 1 = CET)
     --raid-start-hour 20                     # local hour the raid block starts
@@ -299,13 +299,13 @@ def main():
                          help="Build one report per raid night present in "
                               "pulls.csv, instead of just one night. Each "
                               "report is written to '<out-dir>/<date>.html'.")
-    parser.add_argument("--out-dir", type=str, default=".",
+    parser.add_argument("--out-dir", type=str, default="output/nights",
                          help="Directory to write per-night reports into "
-                              "when --all-nights is set (default: current "
-                              "directory)")
-    parser.add_argument("--template", type=str, default="night_report_template.html",
+                              "when --all-nights is set (default: "
+                              "output/nights)")
+    parser.add_argument("--template", type=str, default="templates/night_report_template.html",
                          help="Path to the HTML template file")
-    parser.add_argument("--out", type=str, default="dmu_night_report.html",
+    parser.add_argument("--out", type=str, default="output/dmu_night_report.html",
                          help="Path to write the built report HTML "
                               "(single-night mode only)")
     add_raid_time_args(parser)

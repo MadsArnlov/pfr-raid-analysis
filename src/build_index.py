@@ -11,13 +11,14 @@ only depends on dmu_common, never on another build script.
 
 USAGE
 -----
-    python build_index.py --pulls-csv ./dmu_data/pulls.csv
+    python src/build_index.py --pulls-csv ./dmu_data/pulls.csv
 
 Optional flags:
-    --template ./index_template.html   # HTML template to inject data into
-    --out ./index.html                 # output file
-    --nights-dir nights                # relative dir the per-night reports
-                                        # live in, used to build links
+    --template ./templates/index_template.html   # HTML template to inject data into
+    --out ./output/index.html                    # output file
+    --nights-dir nights                          # relative dir the per-night
+                                                  # reports live in, used to
+                                                  # build links
 """
 
 from __future__ import annotations
@@ -50,9 +51,9 @@ def main():
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--pulls-csv", type=str, default="./dmu_data/pulls.csv",
                          help="Path to pulls.csv from main.py")
-    parser.add_argument("--template", type=str, default="index_template.html",
+    parser.add_argument("--template", type=str, default="templates/index_template.html",
                          help="Path to the HTML template file")
-    parser.add_argument("--out", type=str, default="index.html",
+    parser.add_argument("--out", type=str, default="output/index.html",
                          help="Path to write the built index page")
     parser.add_argument("--nights-dir", type=str, default="nights",
                          help="Relative directory the per-night reports live "
