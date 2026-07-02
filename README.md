@@ -1,22 +1,22 @@
 # Dancing Mad (Ultimate) Log Fetcher & Dashboard
 
 Pulls your raid group's Dancing Mad (Ultimate) log data from FFLogs and turns
-it into a self-updating HTML progress dashboard (pull stats, kills/wipes,
-phase reached, pitfalls, hour-by-hour performance, etc.).
+it into a self-updating HTML progress dashboard (prog curve, pull stats,
+kills/wipes, phase reached, pitfalls, hour-by-hour performance) plus a
+single-night deep-dive report.
 
 ## Files in this kit
 
 | File | Purpose |
 |---|---|
-| `fetch_dmu_logs.py` | Pulls raw pull data from FFLogs → `pulls.csv` |
+| `main.py` | Pulls raw pull data from FFLogs → `pulls.csv` (incremental — only new/changed reports hit the API) |
+| `refresh.py` | One command: fetch + rebuild both HTML reports |
+| `dmu_common.py` | Shared data logic imported by both build scripts |
 | `build_dashboard.py` | Turns `pulls.csv` into the full-history HTML dashboard |
 | `dashboard_template.html` | Visual shell used by `build_dashboard.py` — keep it alongside the script |
 | `build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night |
 | `night_report_template.html` | Visual shell used by `build_night_report.py` — keep it alongside the script |
-| `requirements.txt` | Python dependencies for both scripts |
-
-Keep all four in the same folder. Re-running the two scripts in sequence is
-the entire refresh workflow — see step 6 below.
+| `pyproject.toml` | Python dependencies (managed with `uv`) |
 
 It talks to FFLogs' public API (v2, GraphQL) using the OAuth **client
 credentials** flow — no login or password needed, just an API client ID and
@@ -43,8 +43,7 @@ If you ever lose the secret, go back to the client page and reset it.
 ## 2. Set up the project
 
 ```bash
-# from the folder containing fetch_dmu_logs.py
-pip install -r requirements.txt
+uv sync
 ```
 
 Create a file named `.env` in the same folder (do **not** share this file or
@@ -57,24 +56,36 @@ FFLOGS_CLIENT_SECRET=your_client_secret_here
 
 ---
 
-## 3. Find your guild ID
+## 3. Run it
 
-It's the number in your guild's FFLogs reports-list URL:
-
-```
-https://www.fflogs.com/guild/reports-list/102435
-                                          ^^^^^^ this is the guild ID
-```
-
----
-
-## 4. Run it
+The entire refresh loop after a raid night is one command:
 
 ```bash
-python fetch_dmu_logs.py --guild-id 102435
+uv run refresh.py
 ```
 
-By default this:
+This fetches the latest logs and rebuilds both `dmu_raid_dashboard.html`
+(full history) and `dmu_night_report.html` (latest night). Open either in
+any browser. Use `--skip-fetch` to rebuild from the existing `pulls.csv`
+without hitting the API; other flags pass through to the build scripts.
+
+Each step is also runnable on its own:
+
+```bash
+uv run main.py                                # fetch → dmu_data/pulls.csv
+uv run build_dashboard.py                     # → dmu_raid_dashboard.html
+uv run build_night_report.py                  # → dmu_night_report.html (latest night)
+uv run build_night_report.py --date 2026-06-24  # a specific past night
+```
+
+The guild ID defaults to this static's (102435). For another guild, pass
+`--guild-id` (it's the number in the FFLogs reports-list URL:
+`https://www.fflogs.com/guild/reports-list/102435`).
+
+### `main.py` fetch behavior and flags
+
+By default the fetch:
+
 - Looks up the FFLogs zone ID for **"Dancing Mad"** (matches "Dancing Mad
   (Ultimate)") and uses it to filter reports server-side, so only DMU logs
   are fetched.
@@ -83,148 +94,84 @@ By default this:
   Kefka, Exdeath & Chaos, Kefka again, Ultima Kefka) show up as a single
   fight named "Dancing Mad" with a `lastPhase` field (1–5) indicating how
   far the pull got — they are not separate fight names.
-- Writes output into `./dmu_data/` (see below).
-
-### Useful flags
+- Is **incremental**: `reports_raw.json` doubles as a cache, and any report
+  whose `endTime` hasn't changed since the last run is reused instead of
+  refetched. A routine refresh only hits the API for the newest raid night.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--guild-id` | *(required)* | Numeric guild ID from the FFLogs URL |
+| `--guild-id` | `102435` | Numeric guild ID from the FFLogs URL |
 | `--zone-name` | `Dancing Mad` | Substring match for the raid zone. Set to `""` to disable zone filtering (fetches all reports, slower) |
 | `--encounter-name` | `Dancing Mad` | Substring match for individual fight names |
 | `--out-dir` | `./dmu_data` | Where output files are written |
 | `--max-reports` | `200` | Safety cap on number of reports fetched |
+| `--full-refetch` | off | Ignore the cache and refetch every report |
 
-Example — widen the fetch if the zone lookup doesn't match anything:
+Output files (in `--out-dir`):
 
-```bash
-python fetch_dmu_logs.py --guild-id 102435 --zone-name "" --encounter-name "Dancing Mad"
-```
-
----
-
-## 5. Output files
-
-All written into `--out-dir` (default `./dmu_data/`):
-
-- **`pulls.csv`** — one row per pull, with:
-  - date/time (UTC), kill or wipe, duration
-  - `fight_percentage` (boss HP % remaining when the pull ended)
-  - `last_phase` (1–5, how far into the fight's phases the pull got)
-  - report code/title it came from
-- **`session_summary.json`** — per-raid-day aggregates:
-  - total pulls, kills, best % of the day, furthest phase reached
-  - hour-by-hour breakdown (pull count, kills, best/avg % per hour of the
-    session)
-- **`reports_raw.json`** — full raw data backup, useful if something needs
-  re-processing later or if you want to double check fight names/zones.
+- **`pulls.csv`** — one row per pull: date/time (UTC), kill or wipe,
+  duration, `fight_percentage` (overall encounter % remaining when the pull
+  ended), `last_phase` (1–5), report code/title. This is the single source
+  of truth for both build scripts.
+- **`reports_raw.json`** — full raw report/fight data; backup and fetch
+  cache in one.
 
 ---
 
-## 6. Build (or rebuild) the dashboard
+## 4. The two reports
 
-Once you have `pulls.csv`, generate the HTML dashboard yourself — no need to
-come back and ask for it to be rebuilt by hand:
+### Full-history dashboard (`build_dashboard.py`)
 
-```bash
-python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
-```
-
-This writes `dmu_raid_dashboard.html` in the current folder. Open it in any
-browser.
-
-`build_dashboard.py` reads only `pulls.csv` — it derives session boundaries,
-raid-night hours, phase stats, and the hour-by-hour breakdown all from that
-one file, so `session_summary.json` isn't needed for this step.
-
-### Refreshing after new raid nights
-
-Whenever you've raided again, just re-run both scripts:
-
-```bash
-python fetch_dmu_logs.py --guild-id 102435
-python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
-```
-
-That's the entire refresh loop — no manual data wrangling, and the charts,
-KPI numbers, and pitfall analysis all update automatically as new pulls and
-phases show up.
-
-### `build_dashboard.py` flags
+Cross-night view: prog curve (every pull + running all-time best), phase
+composition per night, pull volume/duration, pitfalls (where pulls die, by
+phase), phase-to-phase conversion rates and their night-over-night trend,
+progression velocity with wall detection, hour-by-hour performance, and a
+per-night log with wall reps and record-night markers.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--pulls-csv` | *(required)* | Path to `pulls.csv` |
+| `--pulls-csv` | `./dmu_data/pulls.csv` | Path to `pulls.csv` |
 | `--template` | `dashboard_template.html` | HTML template to inject data into |
 | `--out` | `dmu_raid_dashboard.html` | Output file path |
 | `--utc-offset` | `2` | Hours added to UTC for local raid time (2 = CEST/summer, 1 = CET/winter) |
 | `--raid-start-hour` | `20` | Local hour your raid block starts (24h, e.g. 20 = 8pm) |
 | `--raid-length-hours` | `3` | Length of your raid block in hours |
+| `--wall-min-pulls-since-record` | `15` | Pulls without a new best before a "wall" can be flagged |
+| `--wall-max-stdev` | `6.0` | Max spread of recent results for a wall to be flagged |
 
 Example for a winter (CET) raid night starting at 19:00 for 4 hours:
 
 ```bash
-python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv \
-  --utc-offset 1 --raid-start-hour 19 --raid-length-hours 4
+uv run build_dashboard.py --utc-offset 1 --raid-start-hour 19 --raid-length-hours 4
 ```
 
-The dashboard automatically adapts to further progress too — the phase
+The dashboard automatically adapts to further progress — the phase
 breakdown, pitfalls section, and progress chart pick up phases 4 and 5 as
 soon as they start appearing in `pulls.csv`, no template changes needed.
 
-**Keep `dashboard_template.html` next to `build_dashboard.py`** — it's the
-visual shell the script injects data into. Editing the template lets you
-restyle the dashboard without touching the data logic at all.
+### Single-night report (`build_night_report.py`)
 
----
-
-## 7. Build a single raid-night report
-
-`build_dashboard.py` looks at every raid night together. If you just want to
-see what happened *last* night — pull-by-pull timeline, whether the group
-was improving or plateauing, downtime between pulls, and how the night
-compares to the all-time best — use `build_night_report.py` instead:
-
-```bash
-python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
-```
-
-By default this picks the most recent raid night present in `pulls.csv`. To
-look at a specific past night instead:
-
-```bash
-python build_night_report.py --pulls-csv ./dmu_data/pulls.csv --date 2026-06-24
-```
-
-This writes `dmu_night_report.html` in the current folder.
-
-### Two refresh loops
-
-- **After each raid night** — a quick single-night recap:
-  ```bash
-  python fetch_dmu_logs.py --guild-id 102435
-  python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
-  ```
-- **Occasionally** — the full multi-night dashboard:
-  ```bash
-  python fetch_dmu_logs.py --guild-id 102435
-  python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
-  ```
-
-Both read the same `pulls.csv` — there's nothing to keep in sync between
-them, and running one doesn't require the other.
-
-### `build_night_report.py` flags
+One night in depth: pull-by-pull timeline with the night's running best,
+trend within the night, hour-by-hour volume and depth, downtime between
+pulls (breaks vs wipe-recovery gaps, avg re-pull speed, share of the session
+actually spent pulling), phase composition, pitfalls, conversion rates, and
+how the night stacks up against the all-time best.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--pulls-csv` | *(required)* | Path to `pulls.csv` |
-| `--date` | most recent night in `pulls.csv` | Raid night to analyze (`YYYY-MM-DD`) |
+| `--pulls-csv` | `./dmu_data/pulls.csv` | Path to `pulls.csv` |
+| `--date` | most recent night | Raid night to analyze (`YYYY-MM-DD`) |
 | `--template` | `night_report_template.html` | HTML template to inject data into |
 | `--out` | `dmu_night_report.html` | Output file path |
+| `--utc-offset` / `--raid-start-hour` / `--raid-length-hours` | `2` / `20` / `3` | Same as the dashboard |
+| `--break-threshold-min` | `10` | Gaps at least this long count as scheduled breaks, not wipe recovery |
 
-**Keep `night_report_template.html` next to `build_night_report.py`** — same
-role as `dashboard_template.html`, just for the single-night report.
+Both reports read the same `pulls.csv` — there's nothing to keep in sync
+between them, and running one doesn't require the other.
+
+**Keep the template files next to their build scripts** — they're the
+visual shells the scripts inject data into. Editing a template restyles a
+report without touching the data logic at all.
 
 ---
 
@@ -236,9 +183,11 @@ role as `dashboard_template.html`, just for the single-night report.
   `--encounter-name` filtering instead.
 - **`401` / auth errors** — double check `.env` values and that there are no
   extra spaces or quote characters around the ID/secret.
-- **Rate limiting** — the script already pauses briefly between requests; if
-  you have a very large number of reports, consider lowering `--max-reports`
-  for a first test run.
+- **Rate limiting** — the script already pauses briefly between requests and
+  reuses cached reports; if you have a very large number of reports,
+  consider lowering `--max-reports` for a first test run.
+- **Stale or weird fetch results** — rerun with `--full-refetch` to bypass
+  the `reports_raw.json` cache.
 - **Empty `pulls.csv`** — check `reports_raw.json` to see what fight names
   and zone names actually appear in your reports, then adjust
   `--encounter-name` / `--zone-name` accordingly. In FFLogs, DMU's 5 phases
@@ -249,6 +198,5 @@ role as `dashboard_template.html`, just for the single-night report.
   for CEST (roughly late March–late October) and 1 for CET (winter). If your
   raid time isn't 20:00–23:00 local, also set `--raid-start-hour` /
   `--raid-length-hours` to match.
-- **`build_dashboard.py` can't find the template** — make sure
-  `dashboard_template.html` is in the same folder, or pass its path
-  explicitly with `--template`.
+- **A build script can't find its template** — make sure the template file
+  is in the same folder, or pass its path explicitly with `--template`.

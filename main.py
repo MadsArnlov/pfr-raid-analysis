@@ -15,27 +15,29 @@ SETUP
        FFLOGS_CLIENT_ID=your_client_id
        FFLOGS_CLIENT_SECRET=your_client_secret
 
-4. pip install requests python-dotenv
-5. Run:
+4. Run:
 
-       python fetch_dmu_logs.py --guild-id 102435
+       uv run main.py
 
    Optional flags:
+       --guild-id 102435                # numeric guild ID from the fflogs URL
        --zone-name "Dancing Mad"        # server-side zone filter, default below
        --encounter-name "Dancing Mad"   # extra fight-name filter, default below
        --out-dir ./dmu_data             # where JSON/CSV output goes
        --max-reports 200                # safety cap
+       --full-refetch                   # ignore the cache and refetch everything
 
 OUTPUT
 ------
-Writes three files into --out-dir:
-  - reports_raw.json     Full raw report/fight data as returned by FFLogs
-  - pulls.csv            One row per pull (fight) on the matching encounter(s)
-  - session_summary.json Per-raid-day aggregated stats (pull count, best %,
-                          kills, avg pull duration, hour-by-hour breakdown)
-
-Upload pulls.csv and session_summary.json back to Claude to build the HTML
-dashboard. reports_raw.json is kept as a full backup / for re-processing.
+Writes two files into --out-dir:
+  - reports_raw.json     Full raw report/fight data as returned by FFLogs.
+                          Doubles as the fetch cache: on the next run, reports
+                          whose endTime hasn't changed are reused instead of
+                          refetched, so a refresh only hits the API for new
+                          raid nights.
+  - pulls.csv            One row per pull (fight) on the matching encounter(s).
+                          This is the single source of truth for
+                          build_dashboard.py and build_night_report.py.
 """
 
 import argparse
@@ -44,7 +46,6 @@ import json
 import os
 import sys
 import time
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -180,15 +181,32 @@ def fetch_fights_for_report(token: str, code: str) -> dict:
     return data["reportData"]["report"]
 
 
+def load_cache(raw_path: str) -> dict:
+    """Previously fetched report details, keyed by report code. Entries carry
+    'report_end_time' (the report-level endTime at fetch time); if the
+    current report list shows the same endTime, the report hasn't gained new
+    fights and the cached fights can be reused."""
+    if not os.path.exists(raw_path):
+        return {}
+    try:
+        with open(raw_path, encoding="utf-8") as f:
+            entries = json.load(f)
+        return {e["code"]: e for e in entries if "code" in e}
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"  WARNING: could not read cache {raw_path} ({e}); refetching everything.")
+        return {}
+
+
 def ms_to_iso(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--guild-id", type=int, required=True,
+    parser.add_argument("--guild-id", type=int, default=102435,
                          help="Numeric guild ID from the fflogs guild URL "
-                              "(e.g. 102435 from /guild/reports-list/102435)")
+                              "(e.g. 102435 from /guild/reports-list/102435). "
+                              "Defaults to this static's guild.")
     parser.add_argument("--zone-name", type=str, default="Dancing Mad",
                          help="Substring to match the FFLogs zone name "
                               "(default: 'Dancing Mad', matches "
@@ -201,6 +219,9 @@ def main():
                               "fight name used across all DMU phases)")
     parser.add_argument("--out-dir", type=str, default="./dmu_data")
     parser.add_argument("--max-reports", type=int, default=200)
+    parser.add_argument("--full-refetch", action="store_true",
+                         help="Ignore cached report data in reports_raw.json "
+                              "and refetch every report from the API")
     args = parser.parse_args()
 
     client_id = os.environ.get("FFLOGS_CLIENT_ID")
@@ -212,6 +233,7 @@ def main():
         sys.exit(1)
 
     os.makedirs(args.out_dir, exist_ok=True)
+    raw_path = os.path.join(args.out_dir, "reports_raw.json")
 
     print("Authenticating with FFLogs...")
     token = get_token(client_id, client_secret)
@@ -230,19 +252,35 @@ def main():
     reports = fetch_all_reports(token, args.guild_id, zone_id, args.max_reports)
     print(f"Found {len(reports)} matching reports for this guild.")
 
+    cache = {} if args.full_refetch else load_cache(raw_path)
+
     all_report_details = []
     pulls = []
+    fetched, reused = 0, 0
 
     for i, rep in enumerate(reports, 1):
         code = rep["code"]
-        print(f"[{i}/{len(reports)}] Fetching fights for report {code} "
-              f"({rep.get('title')})...")
-        try:
-            detail = fetch_fights_for_report(token, code)
-        except Exception as e:
-            print(f"  WARNING: failed to fetch {code}: {e}")
-            continue
-        all_report_details.append({"code": code, **detail})
+        cached = cache.get(code)
+        if cached is not None and cached.get("report_end_time") == rep.get("endTime"):
+            detail = cached
+            reused += 1
+        else:
+            print(f"[{i}/{len(reports)}] Fetching fights for report {code} "
+                  f"({rep.get('title')})...")
+            try:
+                detail = fetch_fights_for_report(token, code)
+            except Exception as e:
+                print(f"  WARNING: failed to fetch {code}: {e}")
+                if cached is not None:
+                    print("  Falling back to the cached copy of this report.")
+                    detail = cached
+                else:
+                    continue
+            else:
+                detail = {"code": code, "report_end_time": rep.get("endTime"), **detail}
+                fetched += 1
+                time.sleep(0.2)  # be polite to the API
+        all_report_details.append(detail)
 
         zone_name = (detail.get("zone") or {}).get("name", "") or ""
         report_title = detail.get("title", "")
@@ -273,13 +311,12 @@ def main():
                 "start_time_epoch_ms": start_ms,
             })
 
-        time.sleep(0.2)  # be polite to the API
+    print(f"Report details: {fetched} fetched from the API, {reused} reused from cache.")
 
     # Sort pulls chronologically
     pulls.sort(key=lambda p: p["start_time_epoch_ms"])
 
-    # Write raw backup
-    raw_path = os.path.join(args.out_dir, "reports_raw.json")
+    # Write raw backup / fetch cache
     with open(raw_path, "w", encoding="utf-8") as f:
         json.dump(all_report_details, f, indent=2)
     print(f"Wrote raw report data to {raw_path}")
@@ -298,57 +335,10 @@ def main():
         writer.writerows(pulls)
     print(f"Wrote {len(pulls)} pulls to {csv_path}")
 
-    # Build per-day session summary + hour-by-hour breakdown
-    sessions = defaultdict(list)
-    for p in pulls:
-        day = p["start_time_utc"][:10]  # YYYY-MM-DD (UTC)
-        sessions[day].append(p)
-
-    session_summary = []
-    for day, day_pulls in sorted(sessions.items()):
-        day_pulls.sort(key=lambda p: p["start_time_epoch_ms"])
-        kills = [p for p in day_pulls if p["kill"]]
-        best_pct = min(
-            (p["fight_percentage"] for p in day_pulls if p["fight_percentage"] is not None),
-            default=None,
-        )
-        by_hour = defaultdict(list)
-        for p in day_pulls:
-            hour = p["start_time_utc"][11:13]
-            by_hour[hour].append(p)
-
-        hourly = []
-        for hour, hp in sorted(by_hour.items()):
-            valid_pcts = [p["fight_percentage"] for p in hp if p["fight_percentage"] is not None]
-            hourly.append({
-                "hour_utc": hour,
-                "pull_count": len(hp),
-                "kills": sum(1 for p in hp if p["kill"]),
-                "best_pct_remaining": min(valid_pcts) if valid_pcts else None,
-                "avg_pct_remaining": round(sum(valid_pcts) / len(valid_pcts), 1) if valid_pcts else None,
-            })
-
-        session_summary.append({
-            "date": day,
-            "total_pulls": len(day_pulls),
-            "kills": len(kills),
-            "best_pct_remaining_of_day": best_pct,
-            "furthest_phase": max((p["last_phase"] for p in day_pulls if p["last_phase"] is not None), default=None),
-            "avg_pull_duration_seconds": round(
-                sum(p["duration_seconds"] for p in day_pulls) / len(day_pulls), 1
-            ),
-            "session_start_utc": day_pulls[0]["start_time_utc"],
-            "session_end_utc": day_pulls[-1]["end_time_utc"],
-            "hourly_breakdown": hourly,
-        })
-
-    summary_path = os.path.join(args.out_dir, "session_summary.json")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        json.dump(session_summary, f, indent=2)
-    print(f"Wrote per-day session summary to {summary_path}")
-
-    print("\nDone. Upload pulls.csv and session_summary.json back to Claude "
-          "to build the HTML dashboard.")
+    print("\nDone. Build the dashboards with:\n"
+          "  uv run build_dashboard.py\n"
+          "  uv run build_night_report.py\n"
+          "or both at once with: uv run refresh.py")
 
 
 if __name__ == "__main__":

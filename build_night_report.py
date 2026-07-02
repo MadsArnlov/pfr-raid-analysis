@@ -2,11 +2,11 @@
 """
 Build a deep-dive report for a single Dancing Mad (Ultimate) raid night.
 
-This reads only pulls.csv (produced by fetch_dmu_logs.py / main.py) and
-filters it down to one raid night — either the most recent night present in
-the file, or a specific `--date`. Everything in the report (pull-by-pull
-timeline, trend within the night, downtime between pulls, phase composition)
-is derived from that one night's rows alone.
+This reads only pulls.csv (produced by main.py) and filters it down to one
+raid night — either the most recent night present in the file, or a specific
+`--date`. Everything in the report (pull-by-pull timeline, trend within the
+night, downtime between pulls, phase composition) is derived from that one
+night's rows alone.
 
 The one exception is the "all-time context" section, which deliberately
 reads the *full*, unfiltered pulls.csv (not just the target night) so the
@@ -26,11 +26,8 @@ Optional flags:
                                               # raid time (2 = CEST, 1 = CET)
     --raid-start-hour 20                     # local hour the raid block starts
     --raid-length-hours 3                    # length of the raid block
-
-Typical "after each raid night" workflow:
-
-    python main.py --guild-id 102435
-    python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
+    --break-threshold-min 10                 # gaps at least this long count as
+                                              # scheduled breaks, not wipe recovery
 """
 
 from __future__ import annotations
@@ -41,38 +38,21 @@ from pathlib import Path
 
 import pandas as pd
 
-
-def bucket_hour(local_hour: int, raid_start: int, raid_length: int) -> str:
-    """Classify an hour into 'pre', one of the raid-block hours (as a
-    string of the block's starting hour), or 'late'. Mirrors the same
-    bucketing used in build_dashboard.py."""
-    if local_hour < raid_start:
-        return "pre"
-    offset = local_hour - raid_start
-    if offset < raid_length:
-        return str(raid_start + offset)
-    return "late"
-
-
-def build_bucket_order_and_labels(raid_start: int, raid_length: int):
-    order = ["pre"] + [str(raid_start + i) for i in range(raid_length)] + ["late"]
-    labels = {"pre": "Pre-raid", "late": f"{(raid_start + raid_length) % 24:02d}:00+"}
-    for i in range(raid_length):
-        h = raid_start + i
-        labels[str(h)] = f"{h % 24:02d}:00–{(h + 1) % 24:02d}:00"
-    return order, labels
-
-
-def load_pulls(csv_path: Path) -> pd.DataFrame:
-    df = pd.read_csv(csv_path)
-    df["start_time_utc"] = pd.to_datetime(df["start_time_utc"])
-    df["end_time_utc"] = pd.to_datetime(df["end_time_utc"])
-    df["date"] = df["start_time_utc"].dt.date.astype(str)
-    return df
+from dmu_common import (
+    add_raid_time_args,
+    all_nights,
+    bucket_hour,
+    build_bucket_order_and_labels,
+    compute_phase_conversion,
+    compute_phase_stats,
+    inject_template,
+    load_pulls,
+    real_pulls,
+)
 
 
 def select_night(df: pd.DataFrame, date_arg: str | None):
-    available = sorted(df["date"].unique())
+    available = all_nights(df)
     target_date = date_arg or available[-1]
     if target_date not in available:
         raise SystemExit(
@@ -88,18 +68,26 @@ def compute_night_overview(night_df: pd.DataFrame) -> dict:
     start = night_df["start_time_utc"].iloc[0]
     end = night_df["end_time_utc"].iloc[-1]
     session_hours = round((end - start).total_seconds() / 3600, 2)
+    session_seconds = (end - start).total_seconds()
+    active_seconds = float(night_df["duration_seconds"].sum())
     total_pulls = int(len(night_df))
+    deepest = int(night_df["last_phase"].max()) if total_pulls else None
     return {
         "date": night_df["date"].iloc[0],
         "total_pulls": total_pulls,
-        "kills": int(night_df["kill"].fillna(False).astype(bool).sum()),
+        "kills": int(night_df["kill"].sum()),
         "session_start_utc": start.isoformat(),
         "session_end_utc": end.isoformat(),
         "session_hours": session_hours,
         "best_pct_remaining": float(real["fight_percentage"].min()) if len(real) else None,
-        "furthest_phase": int(night_df["last_phase"].max()) if total_pulls else None,
+        "furthest_phase": deepest,
+        # pulls that reached the night's deepest phase — reps on the wall
+        "wall_reps": int((night_df["last_phase"] >= deepest).sum()) if deepest else 0,
         "avg_pull_duration_seconds": round(float(night_df["duration_seconds"].mean()), 1) if total_pulls else None,
         "pulls_per_hour": round(total_pulls / session_hours, 1) if session_hours > 0 else None,
+        "active_seconds": round(active_seconds, 1),
+        # share of the session actually spent in the instance pulling
+        "active_pct": round(active_seconds / session_seconds * 100, 1) if session_seconds > 0 else None,
     }
 
 
@@ -121,7 +109,7 @@ def compute_pull_timeline(night_df: pd.DataFrame) -> list:
             "end_time_utc": row["end_time_utc"].isoformat(),
             "duration_seconds": float(row["duration_seconds"]),
             "gap_since_previous_seconds": gap,
-            "kill": bool(row["kill"]) if not pd.isna(row["kill"]) else False,
+            "kill": bool(row["kill"]),
             "fight_percentage": fp,
             "last_phase": int(row["last_phase"]) if not pd.isna(row["last_phase"]) else 0,
             "is_reset": bool(is_reset),
@@ -150,7 +138,7 @@ def compute_hourly_breakdown(night_df: pd.DataFrame, utc_offset: int,
             "bucket": b,
             "label": bucket_labels[b],
             "pull_count": int(len(sub)),
-            "kills": int(sub["kill"].fillna(False).astype(bool).sum()),
+            "kills": int(sub["kill"].sum()),
             "avg_pct": round(float(valid["fight_percentage"].mean()), 1) if len(valid) else None,
             "best_pct": round(float(valid["fight_percentage"].min()), 2) if len(valid) else None,
         })
@@ -163,7 +151,7 @@ def compute_hourly_breakdown(night_df: pd.DataFrame, utc_offset: int,
 
 
 def compute_trend(pull_timeline: list, hourly: dict) -> dict:
-    real_pulls = [p for p in pull_timeline if not p["is_reset"]]
+    real_pulls_list = [p for p in pull_timeline if not p["is_reset"]]
 
     scored_buckets = [b for b in hourly["buckets"] if b["avg_pct"] is not None]
     if len(scored_buckets) < 2:
@@ -181,7 +169,7 @@ def compute_trend(pull_timeline: list, hourly: dict) -> dict:
         else:
             direction = "plateauing"
 
-    best_pull = min(real_pulls, key=lambda p: p["fight_percentage"]) if real_pulls else None
+    best_pull = min(real_pulls_list, key=lambda p: p["fight_percentage"]) if real_pulls_list else None
     best_pull_position = None
     if best_pull is not None:
         n = len(pull_timeline)
@@ -202,19 +190,31 @@ def compute_trend(pull_timeline: list, hourly: dict) -> dict:
     }
 
 
-def compute_downtime(pull_timeline: list) -> dict:
+def compute_downtime(pull_timeline: list, break_threshold_seconds: float) -> dict:
+    """Gaps between pulls, in chronological order, split into scheduled-break
+    sized gaps vs normal wipe-recovery gaps. Re-pull speed (avg recovery gap)
+    is the number a raid leader can actually act on — breaks would drown it
+    out if averaged together."""
     gaps = [
-        {"after_pull_index": p["index"] - 1, "gap_seconds": p["gap_since_previous_seconds"]}
+        {
+            "after_pull_index": p["index"] - 1,
+            "gap_seconds": p["gap_since_previous_seconds"],
+            "is_break": p["gap_since_previous_seconds"] >= break_threshold_seconds,
+        }
         for p in pull_timeline
         if p["gap_since_previous_seconds"] is not None
     ]
-    gaps.sort(key=lambda g: g["gap_seconds"], reverse=True)
     gap_values = [g["gap_seconds"] for g in gaps]
+    breaks = [g for g in gaps if g["is_break"]]
+    recoveries = [g["gap_seconds"] for g in gaps if not g["is_break"]]
     return {
         "gaps": gaps,
+        "break_threshold_seconds": break_threshold_seconds,
         "total_downtime_seconds": round(sum(gap_values), 1) if gap_values else 0.0,
-        "longest_gap_seconds": gap_values[0] if gap_values else None,
-        "avg_gap_seconds": round(sum(gap_values) / len(gap_values), 1) if gap_values else None,
+        "break_count": len(breaks),
+        "break_seconds": round(sum(g["gap_seconds"] for g in breaks), 1),
+        "longest_gap_seconds": max(gap_values) if gap_values else None,
+        "avg_recovery_seconds": round(sum(recoveries) / len(recoveries), 1) if recoveries else None,
     }
 
 
@@ -224,61 +224,6 @@ def compute_phase_composition_single(night_df: pd.DataFrame) -> dict:
         key = "p0_reset" if phase == 0 else f"p{int(phase)}"
         comp[key] = int(count)
     return comp
-
-
-def compute_phase_conversion(real: pd.DataFrame) -> list:
-    """Mirrors build_dashboard.py's phase-to-phase conversion, scoped to one
-    night: of the pulls that reached phase N, what share survived it and
-    pushed into phase N+1 (or, for the deepest phase reached, into an actual
-    kill)."""
-    if real.empty:
-        return []
-    max_phase = int(real["last_phase"].max())
-    conversion = []
-    for p in range(1, max_phase):
-        entered = int((real["last_phase"] >= p).sum())
-        converted = int((real["last_phase"] > p).sum())
-        conversion.append({
-            "from_phase": p,
-            "to_phase": p + 1,
-            "entered": entered,
-            "converted": converted,
-            "rate_pct": round(converted / entered * 100, 1) if entered else None,
-        })
-    entered_final = int((real["last_phase"] >= max_phase).sum())
-    kills = int(real.loc[real["last_phase"] >= max_phase, "kill"].fillna(False).astype(bool).sum())
-    conversion.append({
-        "from_phase": max_phase,
-        "to_phase": "kill",
-        "entered": entered_final,
-        "converted": kills,
-        "rate_pct": round(kills / entered_final * 100, 1) if entered_final else None,
-    })
-    return conversion
-
-
-def compute_phase_stats(real: pd.DataFrame) -> dict:
-    """Mirrors build_dashboard.py's phase_stats (pitfalls), scoped to one
-    night: distribution of HP% remaining at pull end, grouped by the phase
-    each pull reached."""
-    phase_stats = {}
-    for phase in sorted(real["last_phase"].unique()):
-        sub = real[real["last_phase"] == phase]
-        bins = list(range(0, 105, 5))
-        hist = pd.cut(sub["fight_percentage"], bins=bins, right=True).value_counts().sort_index()
-        hist_list = [{"range": f"{int(iv.left)}-{int(iv.right)}", "count": int(c)}
-                     for iv, c in hist.items() if c > 0]
-        mode_bin = max(hist_list, key=lambda x: x["count"]) if hist_list else None
-        phase_stats[int(phase)] = {
-            "n": int(len(sub)),
-            "min_pct": float(sub["fight_percentage"].min()),
-            "max_pct": float(sub["fight_percentage"].max()),
-            "mean_pct": round(float(sub["fight_percentage"].mean()), 2),
-            "stdev_pct": round(float(sub["fight_percentage"].std()), 2) if len(sub) >= 2 else None,
-            "histogram": hist_list,
-            "wall_bucket": mode_bin,
-        }
-    return phase_stats
 
 
 def compute_context(full_df: pd.DataFrame, night_overview: dict, target_date: str) -> dict:
@@ -309,7 +254,7 @@ def compute_context(full_df: pd.DataFrame, night_overview: dict, target_date: st
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--pulls-csv", type=str, required=True,
+    parser.add_argument("--pulls-csv", type=str, default="./dmu_data/pulls.csv",
                          help="Path to pulls.csv from main.py")
     parser.add_argument("--date", type=str, default=None,
                          help="Raid night to analyze (YYYY-MM-DD). Defaults to "
@@ -318,37 +263,22 @@ def main():
                          help="Path to the HTML template file")
     parser.add_argument("--out", type=str, default="dmu_night_report.html",
                          help="Path to write the built report HTML")
-    parser.add_argument("--utc-offset", type=int, default=2,
-                         help="Hours to add to UTC to get your local raid "
-                              "time (default 2 = CEST). Use 1 for CET in "
-                              "winter.")
-    parser.add_argument("--raid-start-hour", type=int, default=20,
-                         help="Local hour (0-23) your raid block starts, "
-                              "default 20 (8pm)")
-    parser.add_argument("--raid-length-hours", type=int, default=3,
-                         help="Length of your raid block in hours, default 3")
+    add_raid_time_args(parser)
+    parser.add_argument("--break-threshold-min", type=float, default=10,
+                         help="Gaps at least this many minutes long count as "
+                              "scheduled breaks rather than wipe recovery, "
+                              "default 10")
     args = parser.parse_args()
 
-    pulls_path = Path(args.pulls_csv)
-    if not pulls_path.exists():
-        raise SystemExit(f"ERROR: {pulls_path} not found. Run main.py first.")
-
-    df = load_pulls(pulls_path)
-    if df.empty:
-        raise SystemExit(f"ERROR: {pulls_path} has no rows.")
-
+    df = load_pulls(Path(args.pulls_csv))
     target_date, night_df = select_night(df, args.date)
 
     night = compute_night_overview(night_df)
     pull_timeline = compute_pull_timeline(night_df)
     hourly = compute_hourly_breakdown(night_df, args.utc_offset, args.raid_start_hour, args.raid_length_hours)
     trend = compute_trend(pull_timeline, hourly)
-    downtime = compute_downtime(pull_timeline)
-    phase_composition = compute_phase_composition_single(night_df)
-    context = compute_context(df, night, target_date)
-    real_night = night_df[night_df["fight_percentage"].notna()]
-    phase_conversion = compute_phase_conversion(real_night)
-    phase_stats = compute_phase_stats(real_night)
+    downtime = compute_downtime(pull_timeline, args.break_threshold_min * 60)
+    real_night = real_pulls(night_df)
 
     data = {
         "night": night,
@@ -356,26 +286,18 @@ def main():
         "hourly": hourly,
         "trend": trend,
         "downtime": downtime,
-        "phase_composition": phase_composition,
-        "context": context,
-        "phase_conversion": phase_conversion,
-        "phase_stats": phase_stats,
+        "phase_composition": compute_phase_composition_single(night_df),
+        "context": compute_context(df, night, target_date),
+        "phase_conversion": compute_phase_conversion(real_night),
+        "phase_stats": compute_phase_stats(real_night),
     }
 
-    # ---------------- inject into template ----------------
-    template_path = Path(args.template)
-    if not template_path.exists():
-        raise SystemExit(f"ERROR: template not found at {template_path}")
-    html = template_path.read_text(encoding="utf-8")
+    inject_template(Path(args.template), Path(args.out), {
+        "__DATA_JSON__": json.dumps(data, separators=(",", ":")),
+        "__DATE_RANGE__": target_date,
+    })
 
-    data_json = json.dumps(data, separators=(",", ":"))
-    html = html.replace("__DATA_JSON__", data_json)
-    html = html.replace("__DATE_RANGE__", target_date)
-
-    out_path = Path(args.out)
-    out_path.write_text(html, encoding="utf-8")
-
-    print(f"Built night report: {out_path}")
+    print(f"Built night report: {args.out}")
     print(f"  {target_date} — {night['total_pulls']} pulls, best {night['best_pct_remaining']}% "
           f"(phase {night['furthest_phase']}), trend: {trend['direction']}")
 

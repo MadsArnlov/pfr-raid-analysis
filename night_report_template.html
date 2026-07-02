@@ -149,6 +149,9 @@
     font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint);
     margin-top:4px;
   }
+  .kpi-strip.cols-4{grid-template-columns:repeat(4, 1fr);}
+  .kpi-strip.cols-4 .kpi:nth-child(4n){border-right:none;}
+  .kpi-strip.cols-4 .kpi:nth-child(-n+4){border-bottom:1px solid var(--hairline);}
 
   /* ---------- SECTIONS ---------- */
   section.block{padding:64px 0;}
@@ -170,6 +173,11 @@
     padding:24px 22px 14px;
   }
   .chart-card canvas{max-width:100%;}
+  .chart-pair{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
 
   /* ---------- TREND PANEL ---------- */
   .trend-grid{
@@ -316,6 +324,7 @@
     .trend-grid{grid-template-columns:1fr;}
     .context-strip{grid-template-columns:1fr;}
     .pitfall-grid{grid-template-columns:1fr;}
+    .chart-pair{grid-template-columns:1fr;}
     .session-table{font-size:11px;}
   }
 </style>
@@ -341,7 +350,7 @@
   </section>
 
   <!-- KPI STRIP -->
-  <div class="kpi-strip" id="kpi-strip"></div>
+  <div class="kpi-strip cols-4" id="kpi-strip"></div>
 
   <!-- PULL TIMELINE -->
   <section class="block">
@@ -372,8 +381,13 @@
       <span class="tag">Local raid time</span>
     </div>
     <p class="block-desc">Pull volume and average HP% remaining broken down by hour of the raid block, in local time. Shows whether progress held up, improved, or fell off as the night went on — more reliable than comparing a single first and last pull.</p>
-    <div class="chart-card">
-      <canvas id="chart-hourly" height="120"></canvas>
+    <div class="chart-pair">
+      <div class="chart-card">
+        <canvas id="chart-hourly-volume" height="210"></canvas>
+      </div>
+      <div class="chart-card">
+        <canvas id="chart-hourly-depth" height="210"></canvas>
+      </div>
     </div>
   </section>
 
@@ -383,7 +397,7 @@
       <h2>Downtime between pulls</h2>
       <span class="tag">Gaps · re-invites · breaks</span>
     </div>
-    <p class="block-desc">Time elapsed between the end of one pull and the start of the next. A long gap usually means a break, a wipe recovery, or a re-invite — not lost progress.</p>
+    <p class="block-desc">Time elapsed between the end of one pull and the start of the next, in order. Gold bars are scheduled-break-sized gaps; violet bars are normal wipe recovery. The number to watch is the average re-pull gap — every 30 seconds shaved off it compounds into extra pulls per night.</p>
     <div class="downtime-summary" id="downtime-summary"></div>
     <div class="chart-card">
       <canvas id="chart-downtime" height="120"></canvas>
@@ -491,7 +505,7 @@ const DATA = __DATA_JSON__;
 
   // ---- HERO ----
   if (context.is_new_best_night) {
-    document.getElementById('hero-badge').innerHTML = '<span class="badge">New season best</span>';
+    document.getElementById('hero-badge').innerHTML = '<span class="badge">New prog best</span>';
   }
   document.getElementById('hero-title').innerHTML = `Raid night · <em>${fmtDate(night.date)}</em>`;
   document.getElementById('hero-copy').textContent =
@@ -506,9 +520,11 @@ const DATA = __DATA_JSON__;
     { val: night.total_pulls, lbl: 'Total pulls' },
     { val: night.session_hours + 'h', lbl: 'Session length' },
     { val: night.pulls_per_hour ?? '—', lbl: 'Pulls / hour' },
-    { val: night.furthest_phase + ' / 5', lbl: 'Furthest phase' },
-    { val: night.kills, lbl: 'Kills' },
     { val: (night.avg_pull_duration_seconds ?? '—') + 's', lbl: 'Avg pull length' },
+    { val: night.furthest_phase + ' / 5', lbl: 'Furthest phase' },
+    { val: night.wall_reps, lbl: 'Pulls at deepest phase' },
+    { val: night.active_pct != null ? night.active_pct + '%' : '—', lbl: 'Time spent pulling' },
+    { val: night.kills, lbl: 'Kills' },
   ];
   document.getElementById('kpi-strip').innerHTML = kpis.map(k =>
     `<div class="kpi"><span class="val">${k.val}</span><div class="lbl">${k.lbl}</div></div>`
@@ -531,6 +547,17 @@ const DATA = __DATA_JSON__;
         pointHoverRadius: 7,
         spanGaps: true,
         tension: 0.15,
+      },
+      {
+        label: "Night's running best",
+        data: pulls.map(p => p.running_best_pct),
+        borderColor: 'rgba(241,236,248,0.65)',
+        backgroundColor: 'rgba(241,236,248,0.65)',
+        stepped: true,
+        pointRadius: 0,
+        pointHitRadius: 0,
+        borderWidth: 1.5,
+        spanGaps: true,
       }]
     },
     options: {
@@ -540,10 +567,11 @@ const DATA = __DATA_JSON__;
         y: { reverse: true, min: 0, max: 100, title: { display: true, text: 'HP% remaining', color: '#6c6087' }, grid: { color: '#241b30' } },
       },
       plugins: {
-        legend: { display: false },
+        legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } },
         tooltip: {
           callbacks: {
             label: (item) => {
+              if (item.datasetIndex === 1) return `Running best: ${item.parsed.y}%`;
               const p = pulls[item.dataIndex];
               const outcome = p.is_reset ? 'Reset/practice' : (p.kill ? 'Kill' : `Wipe · Phase ${p.last_phase}`);
               const gap = p.gap_since_previous_seconds != null ? `${Math.round(p.gap_since_previous_seconds)}s gap before` : 'First pull';
@@ -599,21 +627,37 @@ const DATA = __DATA_JSON__;
     </div>
   `).join('');
 
-  // ---- HOUR-BY-HOUR CHART ----
-  new Chart(document.getElementById('chart-hourly'), {
+  // ---- HOUR-BY-HOUR CHARTS (paired single-axis) ----
+  new Chart(document.getElementById('chart-hourly-volume'), {
+    type: 'bar',
     data: {
       labels: hourly.buckets.map(b => b.label),
       datasets: [
-        { type: 'bar', label: 'Pulls', data: hourly.buckets.map(b => b.pull_count), backgroundColor: 'rgba(139,107,255,0.5)', borderRadius: 3, yAxisID: 'y' },
-        { type: 'line', label: 'Avg HP% remaining', data: hourly.buckets.map(b => b.avg_pct), borderColor: '#ffc73f', backgroundColor: '#ffc73f', yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2 }
+        { label: 'Pulls', data: hourly.buckets.map(b => b.pull_count), backgroundColor: 'rgba(139,107,255,0.5)', borderRadius: 3 },
       ]
     },
     options: {
       responsive: true,
       scales: {
         x: { grid: { display: false } },
-        y: { title: { display: true, text: 'Pulls', color: '#6c6087' }, grid: { color: '#241b30' } },
-        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Avg HP% remaining', color: '#6c6087' }, grid: { display: false } },
+        y: { title: { display: true, text: 'Pulls', color: '#6c6087' }, grid: { color: '#241b30' }, ticks: { precision: 0 } },
+      },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } } }
+    }
+  });
+  new Chart(document.getElementById('chart-hourly-depth'), {
+    type: 'line',
+    data: {
+      labels: hourly.buckets.map(b => b.label),
+      datasets: [
+        { label: 'Avg HP% remaining', data: hourly.buckets.map(b => b.avg_pct), borderColor: '#ffc73f', backgroundColor: '#ffc73f', tension: .3, pointRadius: 4, borderWidth: 2, spanGaps: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { display: false } },
+        y: { reverse: true, min: 0, max: 100, title: { display: true, text: 'Avg HP% remaining (lower = deeper)', color: '#6c6087' }, grid: { color: '#241b30' } },
       },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } } }
     }
@@ -622,8 +666,9 @@ const DATA = __DATA_JSON__;
   // ---- DOWNTIME ----
   const dSummary = [
     { val: fmtDuration(downtime.total_downtime_seconds), lbl: 'Total downtime' },
+    { val: downtime.break_count > 0 ? `${downtime.break_count} · ${fmtDuration(downtime.break_seconds)}` : 'None', lbl: 'Breaks' },
+    { val: downtime.avg_recovery_seconds != null ? fmtDuration(downtime.avg_recovery_seconds) : '—', lbl: 'Avg re-pull gap' },
     { val: downtime.longest_gap_seconds != null ? fmtDuration(downtime.longest_gap_seconds) : '—', lbl: 'Longest gap' },
-    { val: downtime.avg_gap_seconds != null ? fmtDuration(downtime.avg_gap_seconds) : '—', lbl: 'Avg gap' },
   ];
   document.getElementById('downtime-summary').innerHTML = dSummary.map(d =>
     `<div class="d-item"><span class="val">${d.val}</span><div class="lbl">${d.lbl}</div></div>`
@@ -636,13 +681,23 @@ const DATA = __DATA_JSON__;
       datasets: [{
         label: 'Gap (seconds)',
         data: downtime.gaps.map(g => g.gap_seconds),
-        backgroundColor: 'rgba(139,107,255,0.5)',
+        backgroundColor: downtime.gaps.map(g => g.is_break ? 'rgba(255,199,63,0.7)' : 'rgba(139,107,255,0.5)'),
         borderRadius: 3,
       }]
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const g = downtime.gaps[item.dataIndex];
+              return `${fmtDuration(g.gap_seconds)} — ${g.is_break ? 'break-sized gap' : 'wipe recovery'}`;
+            }
+          }
+        }
+      },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 60, minRotation: 60, font: { size: 9 } } },
         y: { title: { display: true, text: 'Seconds', color: '#6c6087' }, grid: { color: '#241b30' } },

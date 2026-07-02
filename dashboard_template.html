@@ -215,6 +215,11 @@
     padding:24px 22px 14px;
   }
   .chart-card canvas{max-width:100%;}
+  .chart-pair{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
 
   /* ---------- PITFALLS GRID ---------- */
   .pitfall-grid{
@@ -297,8 +302,12 @@
   .phase-pill{
     display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
   }
+  .phase-pill.p1{background:rgba(255,199,63,0.14); color:var(--gold);}
   .phase-pill.p2{background:rgba(255,63,143,0.14); color:var(--magenta);}
   .phase-pill.p3{background:rgba(139,107,255,0.16); color:var(--violet);}
+  .phase-pill.p4{background:rgba(87,224,208,0.16); color:#57e0d0;}
+  .phase-pill.p5{background:rgba(255,122,63,0.16); color:#ff7a3f;}
+  .record-star{color:var(--gold); margin-left:4px;}
 
   footer{
     padding:40px 0 60px;
@@ -314,6 +323,7 @@
     .kpi:nth-child(3){border-right:none;}
     .kpi{border-bottom:1px solid var(--hairline);}
     .pitfall-grid{grid-template-columns:1fr;}
+    .chart-pair{grid-template-columns:1fr;}
     .session-table{font-size:11px;}
   }
 
@@ -336,7 +346,7 @@
       </div>
       <div class="hero-stat">
         <span class="num" id="hero-num">—<sup>%</sup></span>
-        <div class="cap">boss hp remaining · current wall</div>
+        <div class="cap">boss hp remaining · all-time best</div>
       </div>
     </div>
 
@@ -360,13 +370,25 @@
   <!-- KPI STRIP -->
   <div class="kpi-strip" id="kpi-strip"></div>
 
+  <!-- PROG CURVE -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Prog curve — every pull</h2>
+      <span class="tag">HP% remaining · running best</span>
+    </div>
+    <p class="block-desc">Every real pull in chronological order — each dot is one pull, colored by the phase it ended in, with the running all-time best as a stepped line. The vertical spread of the dots is consistency; every step down in the line is a new record. A flat line over a tight dot cluster is a wall.</p>
+    <div class="chart-card">
+      <canvas id="chart-prog-curve" height="170"></canvas>
+    </div>
+  </section>
+
   <!-- PROGRESS PER RAID -->
   <section class="block">
     <div class="block-head">
       <h2>Fight progress, per raid night</h2>
       <span class="tag">Phase reached · pull composition</span>
     </div>
-    <p class="block-desc">Each bar is one raid night, split by how far pulls that night got. As phase&nbsp;1 shrinks and phase&nbsp;3 grows, the group is spending less time re-clearing old ground and more time on the current wall. The line tracks the single best pull (lowest boss HP%) of the night.</p>
+    <p class="block-desc">Each bar is one raid night, split by how far pulls that night got. As phase&nbsp;1 shrinks and the deepest phase grows, the group is spending less time re-clearing old ground and more time getting reps on the current wall.</p>
     <div class="chart-card">
       <canvas id="chart-progress" height="170"></canvas>
     </div>
@@ -378,9 +400,14 @@
       <h2>Pull stats, per raid night</h2>
       <span class="tag">Volume · duration</span>
     </div>
-    <p class="block-desc">Pull count per night (bars) against average pull length in seconds (line). Fewer, longer pulls is the expected shape as prog gets deeper — each attempt survives further before dying.</p>
-    <div class="chart-card">
-      <canvas id="chart-pulls" height="160"></canvas>
+    <p class="block-desc">Pull count per night, and average pull length. Fewer, longer pulls is the expected shape as prog gets deeper — each attempt survives further before dying. Falling pull counts <em>without</em> rising duration means time is leaking into downtime instead.</p>
+    <div class="chart-pair">
+      <div class="chart-card">
+        <canvas id="chart-pulls" height="210"></canvas>
+      </div>
+      <div class="chart-card">
+        <canvas id="chart-duration" height="210"></canvas>
+      </div>
     </div>
   </section>
 
@@ -431,19 +458,19 @@
       <h2>Hour-by-hour pull performance</h2>
       <span class="tag">20:00–23:00 CEST · aggregated + per raid night</span>
     </div>
-    <p class="block-desc">The static raids a fixed 20:00–23:00 CEST block. Bars below are grouped by actual clock hour (not UTC, not "hour into session"), aggregated across all 14 nights.</p>
-    <div class="chart-card">
-      <canvas id="chart-hourly" height="150"></canvas>
+    <p class="block-desc">The static raids a fixed 20:00–23:00 CEST block. Charts below are grouped by actual clock hour (not UTC, not "hour into session"), aggregated across all <span id="night-count">—</span> nights — a consistently shallow late hour is a fatigue signal.</p>
+    <div class="chart-pair">
+      <div class="chart-card">
+        <canvas id="chart-hourly-volume" height="210"></canvas>
+      </div>
+      <div class="chart-card">
+        <canvas id="chart-hourly-depth" height="210"></canvas>
+      </div>
     </div>
 
     <p class="block-desc" style="margin-top:36px;">Same data broken out per raid night: each cell is the average boss HP% remaining for pulls started in that clock hour. Darker / cooler = deeper progress that hour, lighter / warmer = pulls stayed shallow. Blank = no pulls that hour.</p>
     <div class="chart-card heatmap-card">
       <div id="hour-heatmap"></div>
-    </div>
-
-    <p class="block-desc" style="margin-top:36px;">Same data again, but session-over-session: one line per raid-block hour, tracked across nights. Tells you whether a specific hour (e.g. hour 3, post-dinner-break energy) is consistently worse than the others, or whether it's catching up over time.</p>
-    <div class="chart-card">
-      <canvas id="chart-hourly-trend" height="150"></canvas>
     </div>
   </section>
 
@@ -451,9 +478,9 @@
   <section class="block">
     <div class="block-head">
       <h2>Raid night log</h2>
-      <span class="tag">All 14 sessions</span>
+      <span class="tag" id="session-count-tag">All sessions</span>
     </div>
-    <p class="block-desc">Full breakdown of every logged raid night, chronologically.</p>
+    <p class="block-desc">Full breakdown of every logged raid night, chronologically. ★ marks nights that set a new all-time best; "wall reps" counts the pulls that reached the current deepest phase that night.</p>
     <div class="chart-card" style="padding:6px 10px;">
       <table class="session-table" id="session-table">
         <thead>
@@ -463,6 +490,7 @@
             <th class="num">Pulls</th>
             <th class="num">Pulls/hr</th>
             <th>Furthest phase</th>
+            <th class="num">Wall reps</th>
             <th class="num">Best HP% left</th>
             <th class="num">Avg pull length</th>
             <th class="num">Consistency (σ)</th>
@@ -492,7 +520,7 @@ const DATA = __DATA_JSON__;
   const sessions = DATA.sessions;
   const phaseComp = DATA.phase_composition;
   const phaseStats = DATA.phase_stats;
-  const posStats = DATA.position_stats;
+  const progCurve = DATA.prog_curve;
 
   // ---- Chart.js global defaults to match theme ----
   Chart.defaults.font.family = "'IBM Plex Mono', monospace";
@@ -501,17 +529,18 @@ const DATA = __DATA_JSON__;
   Chart.defaults.borderColor = '#352a48';
 
   // ---- HERO ----
-  document.getElementById('hero-num').innerHTML = ov.current_best_pct + '<sup>%</sup>';
+  document.getElementById('hero-num').innerHTML = ov.all_time_best_pct + '<sup>%</sup>';
   document.getElementById('hero-copy').textContent =
     `${ov.total_pulls} pulls across ${ov.total_sessions} raid nights (${ov.total_hours} hours logged) between ${fmtDate(ov.date_start)} and ${fmtDate(ov.date_end)}. ` +
-    `Furthest reached: Phase ${ov.furthest_phase_reached} of 5. Kills so far: ${ov.total_kills}.`;
+    `Furthest reached: Phase ${ov.furthest_phase_reached} of 5. Kills so far: ${ov.total_kills}. ` +
+    `Latest night's best: ${ov.latest_night_best_pct != null ? ov.latest_night_best_pct + '%' : '—'}.`;
 
   // ---- HP RAIL ----
-  const pct = ov.current_best_pct;
+  const pct = ov.all_time_best_pct;
   document.getElementById('rail-fill').style.setProperty('--pct', (100-pct) + '%');
   const marker = document.getElementById('rail-marker');
   marker.style.setProperty('--pct', (100-pct) + '%');
-  marker.setAttribute('data-label', pct + '% — current wall');
+  marker.setAttribute('data-label', pct + '% — all-time best');
 
   const ALL_PHASE_LABELS = {
     1: 'Phase 1 · Kefka', 2: 'Phase 2 · God Kefka', 3: 'Phase 3 · Exdeath & Chaos',
@@ -537,15 +566,71 @@ const DATA = __DATA_JSON__;
     { val: ov.total_pulls, lbl: 'Total pulls' },
     { val: ov.total_sessions, lbl: 'Raid nights' },
     { val: ov.total_hours + 'h', lbl: 'Hours logged' },
+    { val: ov.avg_pulls_per_hour ?? '—', lbl: 'Avg pulls / hour' },
     { val: ov.furthest_phase_reached + ' / 5', lbl: 'Furthest phase' },
     { val: ov.total_kills, lbl: 'Kills' },
-    { val: ov.reset_pulls, lbl: 'Practice / reset pulls' },
   ];
   document.getElementById('kpi-strip').innerHTML = kpis.map(k =>
     `<div class="kpi"><span class="val">${k.val}</span><div class="lbl">${k.lbl}</div></div>`
   ).join('');
 
-  // ---- PROGRESS CHART (stacked bar + best% line) ----
+  // ---- data-driven night counts in section copy ----
+  document.getElementById('night-count').textContent = ov.total_sessions;
+  document.getElementById('session-count-tag').textContent = `All ${ov.total_sessions} sessions`;
+
+  // ---- PROG CURVE (every pull + running best) ----
+  new Chart(document.getElementById('chart-prog-curve'), {
+    data: {
+      datasets: [
+        {
+          type: 'scatter',
+          label: 'Pull (colored by phase reached)',
+          data: progCurve.map(p => ({ x: p.i, y: p.pct })),
+          pointBackgroundColor: progCurve.map(p => p.is_record ? (PHASE_COLOR[p.phase] || '#f1ecf8') : (PHASE_COLOR_DIM[p.phase] || 'rgba(255,255,255,0.3)')),
+          pointBorderColor: progCurve.map(p => p.is_record ? '#f1ecf8' : 'rgba(0,0,0,0)'),
+          pointBorderWidth: progCurve.map(p => p.is_record ? 1.5 : 0),
+          pointRadius: progCurve.map(p => p.is_record ? 4.5 : 2.5),
+          pointHoverRadius: 6,
+        },
+        {
+          type: 'line',
+          label: 'Running all-time best',
+          data: progCurve.map(p => ({ x: p.i, y: p.best })),
+          borderColor: '#f1ecf8',
+          backgroundColor: '#f1ecf8',
+          stepped: true,
+          pointRadius: 0,
+          pointHitRadius: 0,
+          borderWidth: 2,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { type: 'linear', min: 1, title: { display: true, text: 'Pull # (all-time)', color: '#6c6087' }, grid: { display: false }, ticks: { precision: 0 } },
+        y: { reverse: true, min: 0, max: 100, title: { display: true, text: 'HP% remaining', color: '#6c6087' }, grid: { color: '#241b30' } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => 'Pull ' + items[0].parsed.x,
+            label: (item) => {
+              const p = progCurve[item.dataIndex];
+              if (item.datasetIndex === 1) return `Running best: ${item.parsed.y}%`;
+              return [
+                `${p.pct}% HP remaining · Phase ${p.phase}`,
+                `${fmtDate(p.date)}${p.is_record ? ' · new record' : ''}${p.kill ? ' · KILL' : ''}`,
+              ];
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // ---- PROGRESS CHART (stacked phase composition) ----
   const dates = phaseComp.map(d => fmtDateShort(d.date));
   // Discover which phase keys are present across all nights (p0_reset, p1, p2, ...)
   const phaseKeys = Object.keys(phaseComp[0] || {})
@@ -568,15 +653,7 @@ const DATA = __DATA_JSON__;
   new Chart(document.getElementById('chart-progress'), {
     data: {
       labels: dates,
-      datasets: [
-        ...phaseDatasets,
-        {
-          type:'line', label:'Best HP% left that night',
-          data: sessions.map(s=>s.best_pct_remaining_of_day),
-          borderColor:'#f1ecf8', backgroundColor:'#f1ecf8',
-          yAxisID:'y1', tension:.3, pointRadius:3, pointBackgroundColor:'#f1ecf8', borderWidth:2,
-        }
-      ]
+      datasets: phaseDatasets
     },
     options: {
       responsive:true,
@@ -584,41 +661,56 @@ const DATA = __DATA_JSON__;
       scales:{
         x:{ stacked:true, grid:{display:false} },
         y:{ stacked:true, title:{display:true, text:'Pulls', color:'#6c6087'}, grid:{color:'#241b30'} },
-        y1:{ position:'right', min:0, max:100, reverse:false, title:{display:true, text:'Best HP% left', color:'#6c6087'}, grid:{display:false} },
       },
       plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
     }
   });
 
-  // ---- PULLS & DURATION CHART ----
+  // ---- PULL VOLUME + DURATION (paired single-axis charts) ----
   new Chart(document.getElementById('chart-pulls'), {
+    type:'bar',
     data:{
       labels: sessions.map(s=>fmtDateShort(s.date)),
       datasets:[
-        { type:'bar', label:'Pulls', data: sessions.map(s=>s.total_pulls), backgroundColor:'rgba(255,63,143,0.45)', borderRadius:3 },
-        { type:'line', label:'Avg pull length (sec)', data: sessions.map(s=>s.avg_pull_duration_seconds),
-          borderColor:'#ffc73f', backgroundColor:'#ffc73f', yAxisID:'y1', tension:.3, pointRadius:3, borderWidth:2 }
+        { label:'Pulls per night', data: sessions.map(s=>s.total_pulls), backgroundColor:'rgba(255,63,143,0.45)', borderRadius:3 },
       ]
     },
     options:{
       responsive:true,
       scales:{
-        x:{ grid:{display:false} },
+        x:{ grid:{display:false}, ticks:{font:{size:9}} },
         y:{ title:{display:true, text:'Pulls', color:'#6c6087'}, grid:{color:'#241b30'} },
-        y1:{ position:'right', title:{display:true, text:'Seconds', color:'#6c6087'}, grid:{display:false} },
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
+    }
+  });
+  new Chart(document.getElementById('chart-duration'), {
+    type:'line',
+    data:{
+      labels: sessions.map(s=>fmtDateShort(s.date)),
+      datasets:[
+        { label:'Avg pull length (sec)', data: sessions.map(s=>s.avg_pull_duration_seconds),
+          borderColor:'#ffc73f', backgroundColor:'#ffc73f', tension:.3, pointRadius:3, borderWidth:2 }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:9}} },
+        y:{ title:{display:true, text:'Seconds', color:'#6c6087'}, grid:{color:'#241b30'} },
       },
       plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
     }
   });
 
-  // ---- HOURLY / CEST CHART ----
+  // ---- HOURLY / CEST (paired single-axis charts) ----
   const hc = DATA.hourly_cest;
-  new Chart(document.getElementById('chart-hourly'), {
+  new Chart(document.getElementById('chart-hourly-volume'), {
+    type:'bar',
     data:{
       labels: hc.aggregated.map(a=>a.label),
       datasets:[
-        { type:'bar', label:'Avg pulls per night', data: hc.aggregated.map(a=>a.avg_pulls_per_night), backgroundColor:'rgba(139,107,255,0.5)', borderRadius:3, yAxisID:'y' },
-        { type:'line', label:'Avg HP% remaining', data: hc.aggregated.map(a=>a.avg_pct), borderColor:'#ffc73f', backgroundColor:'#ffc73f', yAxisID:'y1', tension:.3, pointRadius:4, borderWidth:2 }
+        { label:'Avg pulls per night', data: hc.aggregated.map(a=>a.avg_pulls_per_night), backgroundColor:'rgba(139,107,255,0.5)', borderRadius:3 },
       ]
     },
     options:{
@@ -626,7 +718,23 @@ const DATA = __DATA_JSON__;
       scales:{
         x:{ grid:{display:false} },
         y:{ title:{display:true, text:'Avg pulls / night', color:'#6c6087'}, grid:{color:'#241b30'} },
-        y1:{ position:'right', min:0, max:100, title:{display:true, text:'Avg HP% remaining', color:'#6c6087'}, grid:{display:false} },
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
+    }
+  });
+  new Chart(document.getElementById('chart-hourly-depth'), {
+    type:'line',
+    data:{
+      labels: hc.aggregated.map(a=>a.label),
+      datasets:[
+        { label:'Avg HP% remaining', data: hc.aggregated.map(a=>a.avg_pct), borderColor:'#ffc73f', backgroundColor:'#ffc73f', tension:.3, pointRadius:4, borderWidth:2 }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{ grid:{display:false} },
+        y:{ reverse:true, min:0, max:100, title:{display:true, text:'Avg HP% remaining (lower = deeper)', color:'#6c6087'}, grid:{color:'#241b30'} },
       },
       plugins:{ legend:{ position:'bottom', labels:{boxWidth:10, boxHeight:10, padding:14} } }
     }
@@ -636,10 +744,14 @@ const DATA = __DATA_JSON__;
   (function(){
     const cols = hc.bucket_order;
     const labels = hc.bucket_labels;
-    // color scale: interpolate between violet (deep progress, low %) and gold (shallow, high %)
+    // color scale: interpolate between violet (deep progress, low %) and gold
+    // (shallow, high %), anchored at the deepest avg actually seen so the
+    // scale keeps resolving as prog gets deeper
+    const allAvgs = hc.grid.flatMap(r => cols.map(c => r.hours[c] && r.hours[c].avg_pct).filter(v => v != null));
+    const floor = Math.min(...allAvgs);
     function cellColor(pct){
       if (pct == null) return null;
-      const t = Math.max(0, Math.min(1, (pct - 45) / (100 - 45))); // 45%->violet, 100%->gold
+      const t = Math.max(0, Math.min(1, (pct - floor) / (100 - floor)));
       const lo = [139,107,255]; // violet = deep progress
       const hi = [255,199,63];  // gold = shallow
       const c = lo.map((v,i)=> Math.round(v + (hi[i]-v)*t));
@@ -680,34 +792,6 @@ const DATA = __DATA_JSON__;
       return d;
     }
   })();
-
-  // ---- HOUR-BUCKET TREND ACROSS NIGHTS (session-over-session) ----
-  const BUCKET_LINE_COLOR = ['#ffc73f', '#ff3f8f', '#8b6bff', '#57e0d0', '#ff7a3f'];
-  new Chart(document.getElementById('chart-hourly-trend'), {
-    type: 'line',
-    data: {
-      labels: hc.grid.map(row => fmtDateShort(row.date)),
-      datasets: hc.bucket_order.map((b, i) => ({
-        label: hc.bucket_labels[b],
-        data: hc.grid.map(row => row.hours[b] ? row.hours[b].avg_pct : null),
-        borderColor: BUCKET_LINE_COLOR[i % BUCKET_LINE_COLOR.length],
-        backgroundColor: BUCKET_LINE_COLOR[i % BUCKET_LINE_COLOR.length],
-        spanGaps: true,
-        tension: .3,
-        pointRadius: 3,
-        borderWidth: 2,
-      }))
-    },
-    options: {
-      responsive: true,
-      scales: {
-        x: { grid: { display: false } },
-        y: { min: 0, max: 100, title: { display: true, text: 'Avg HP% remaining', color: '#6c6087' }, grid: { color: '#241b30' } },
-      },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } } }
-    }
-  });
-
 
   // ---- PITFALLS ----
   const phaseNames = PHASE_NAMES;
@@ -880,12 +964,13 @@ const DATA = __DATA_JSON__;
   const tbody = document.querySelector('#session-table tbody');
   tbody.innerHTML = sessions.map(s => `
     <tr>
-      <td>${fmtDate(s.date)}</td>
+      <td>${fmtDate(s.date)}${s.is_record_night ? '<span class="record-star" title="Set a new all-time best">★</span>' : ''}</td>
       <td class="num">${s.session_hours}</td>
       <td class="num">${s.total_pulls}</td>
       <td class="num">${s.pulls_per_hour}</td>
       <td><span class="phase-pill p${s.furthest_phase}">Phase ${s.furthest_phase}</span></td>
-      <td class="num">${s.best_pct_remaining_of_day}%</td>
+      <td class="num">${s.wall_reps}</td>
+      <td class="num">${s.best_pct_remaining_of_day != null ? s.best_pct_remaining_of_day + '%' : '—'}</td>
       <td class="num">${s.avg_pull_duration_seconds}s</td>
       <td class="num">${s.pct_stdev != null ? s.pct_stdev + '%' : '—'}</td>
     </tr>
