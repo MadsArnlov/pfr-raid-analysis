@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dancing Mad (Ultimate) — Raid Night Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500;1,9..144,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Styling is intentionally duplicated from dashboard_template.html (same theme).
+     If you change the palette/fonts there, mirror the change here. -->
+<style>
+  :root{
+    --bg: #120e1a;
+    --bg-panel: #1a1424;
+    --bg-panel-2: #221a30;
+    --hairline: #352a48;
+    --ink: #f1ecf8;
+    --ink-dim: #9c8fb8;
+    --ink-faint: #6c6087;
+    --magenta: #ff3f8f;
+    --magenta-dim: #c72e6f;
+    --gold: #ffc73f;
+    --gold-dim: #d1a230;
+    --violet: #8b6bff;
+    --violet-dim: #6b4fd1;
+    --grey: #4a4160;
+    --good: #6ee7b7;
+    --bad: #ff6b6b;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,63,143,0.10), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(139,107,255,0.08), transparent),
+      var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3, .display{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+
+  .wrap{max-width:1100px; margin:0 auto; padding:0 28px;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    padding:76px 0 40px;
+    border-bottom:1px solid var(--hairline);
+    position:relative;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--magenta);
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px; height:1px;
+    background:var(--magenta);
+    display:inline-block;
+  }
+  .badge{
+    display:inline-block;
+    font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;
+    padding:5px 12px; border-radius:20px;
+    background:rgba(255,199,63,0.16); color:var(--gold);
+    margin-bottom:18px;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap:48px;
+    align-items:end;
+  }
+  .hero h1{
+    font-size:clamp(36px, 5.5vw, 60px);
+    line-height:1.02;
+    margin:0 0 18px;
+    color:var(--ink);
+  }
+  .hero h1 em{
+    font-style:italic;
+    color:var(--magenta);
+  }
+  .hero p{
+    color:var(--ink-dim);
+    font-size:15px;
+    max-width:56ch;
+    margin:0;
+  }
+  .hero-stat{
+    text-align:right;
+  }
+  .hero-stat .num{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-style:italic;
+    font-size:clamp(56px, 9vw, 108px);
+    line-height:0.85;
+    color:var(--gold);
+    display:block;
+  }
+  .hero-stat .num sup{
+    font-size:0.35em;
+    top:-0.5em;
+  }
+  .hero-stat .cap{
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-top:4px;
+  }
+
+  /* ---------- KPI STRIP ---------- */
+  .kpi-strip{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    border-top:1px solid var(--hairline);
+    border-bottom:1px solid var(--hairline);
+    margin-top:40px;
+  }
+  .kpi{
+    padding:22px 18px;
+    border-right:1px solid var(--hairline);
+  }
+  .kpi:last-child{border-right:none;}
+  .kpi .val{
+    font-family:'Fraunces', serif; font-weight:700; font-size:28px; color:var(--ink);
+    display:block;
+  }
+  .kpi .lbl{
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint);
+    margin-top:4px;
+  }
+
+  /* ---------- SECTIONS ---------- */
+  section.block{padding:64px 0;}
+  section.block + section.block{border-top:1px solid var(--hairline);}
+  .block-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px; flex-wrap:wrap; gap:10px;
+  }
+  .block-head h2{font-size:26px; margin:0; color:var(--ink);}
+  .block-head .tag{
+    font-size:11px; color:var(--ink-faint); letter-spacing:0.06em; text-transform:uppercase;
+  }
+  .block-desc{color:var(--ink-dim); font-size:13.5px; max-width:70ch; margin:0 0 32px;}
+
+  .chart-card{
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:24px 22px 14px;
+  }
+  .chart-card canvas{max-width:100%;}
+
+  /* ---------- TREND PANEL ---------- */
+  .trend-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:18px;
+  }
+  .trend-card{
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:22px;
+  }
+  .trend-card .lbl{
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint);
+    margin-bottom:10px;
+  }
+  .trend-card .val{
+    font-family:'Fraunces', serif; font-weight:700; font-size:22px; color:var(--ink);
+  }
+  .trend-card .val.improving{color:var(--good);}
+  .trend-card .val.regressing{color:var(--bad);}
+  .trend-card .val.plateauing{color:var(--gold);}
+  .trend-card p{font-size:12.5px; color:var(--ink-dim); margin:10px 0 0; line-height:1.55;}
+
+  /* ---------- DOWNTIME ---------- */
+  .downtime-summary{
+    display:flex; gap:32px; margin-bottom:22px; flex-wrap:wrap;
+  }
+  .downtime-summary .d-item .val{
+    font-family:'Fraunces', serif; font-weight:700; font-size:24px; color:var(--ink); display:block;
+  }
+  .downtime-summary .d-item .lbl{
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint); margin-top:2px;
+  }
+
+  /* ---------- CONTEXT STRIP ---------- */
+  .context-strip{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:18px;
+  }
+  .context-card{
+    background:var(--bg-panel);
+    border:1px solid var(--hairline);
+    border-radius:10px;
+    padding:20px;
+  }
+  .context-card .lbl{
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:8px;
+  }
+  .context-card .val{
+    font-family:'Fraunces', serif; font-weight:700; font-size:24px; color:var(--ink);
+  }
+  .context-card .sub{font-size:12px; color:var(--ink-dim); margin-top:6px;}
+
+  /* ---------- PHASE COMPOSITION ---------- */
+  .phase-bar-wrap{
+    display:flex; height:40px; border-radius:6px; overflow:hidden; border:1px solid var(--hairline);
+  }
+  .phase-bar-seg{
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:600; color:#150f22;
+  }
+  .phase-legend{
+    display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;
+  }
+  .phase-legend .tag2{
+    font-size:11px; color:var(--ink-dim); display:flex; align-items:center; gap:7px;
+  }
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+
+  /* ---------- PULL LOG TABLE ---------- */
+  .session-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .session-table th{
+    text-align:left; font-weight:600; color:var(--ink-faint);
+    text-transform:uppercase; font-size:10.5px; letter-spacing:0.06em;
+    padding:10px 12px; border-bottom:1px solid var(--hairline);
+  }
+  .session-table td{
+    padding:12px; border-bottom:1px solid var(--hairline);
+    color:var(--ink-dim);
+  }
+  .session-table tr:hover td{background:rgba(255,255,255,0.02); color:var(--ink);}
+  .session-table td.num, .session-table th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  .session-table tr.kill td{background:rgba(110,231,183,0.06);}
+  .session-table tr.best td{background:rgba(255,199,63,0.08);}
+  .phase-pill{
+    display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .phase-pill.p1{background:rgba(255,199,63,0.14); color:var(--gold);}
+  .phase-pill.p2{background:rgba(255,63,143,0.14); color:var(--magenta);}
+  .phase-pill.p3{background:rgba(139,107,255,0.16); color:var(--violet);}
+  .phase-pill.p4{background:rgba(87,224,208,0.16); color:#57e0d0;}
+  .phase-pill.p5{background:rgba(255,122,63,0.16); color:#ff7a3f;}
+  .phase-pill.p0{background:rgba(74,65,96,0.3); color:var(--ink-faint);}
+  .kill-pill{
+    display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600;
+    background:rgba(110,231,183,0.16); color:var(--good);
+  }
+
+  footer{
+    padding:40px 0 60px;
+    color:var(--ink-faint);
+    font-size:11.5px;
+    border-top:1px solid var(--hairline);
+  }
+
+  @media (max-width: 860px){
+    .hero-grid{grid-template-columns:1fr; gap:20px;}
+    .hero-stat{text-align:left;}
+    .kpi-strip{grid-template-columns:repeat(3,1fr);}
+    .kpi:nth-child(3){border-right:none;}
+    .kpi{border-bottom:1px solid var(--hairline);}
+    .trend-grid{grid-template-columns:1fr;}
+    .context-strip{grid-template-columns:1fr;}
+    .session-table{font-size:11px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">Dancing Mad (Ultimate) · Raid Night Report</div>
+    <div id="hero-badge"></div>
+    <div class="hero-grid">
+      <div>
+        <h1 id="hero-title">Loading raid night…</h1>
+        <p id="hero-copy">Loading raid log…</p>
+      </div>
+      <div class="hero-stat">
+        <span class="num" id="hero-num">—<sup>%</sup></span>
+        <div class="cap">boss hp remaining · best this night</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip" id="kpi-strip"></div>
+
+  <!-- PULL TIMELINE -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Pull-by-pull timeline</h2>
+      <span class="tag">Progress through the night</span>
+    </div>
+    <p class="block-desc">Every pull of the night, in order. The line tracks boss HP% remaining at the end of each pull (lower = deeper progress); markers are colored by outcome. Hover a point for phase, duration, and the gap since the previous pull.</p>
+    <div class="chart-card">
+      <canvas id="chart-timeline" height="150"></canvas>
+    </div>
+  </section>
+
+  <!-- TREND -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Trend within the night</h2>
+      <span class="tag" id="trend-tag">—</span>
+    </div>
+    <p class="block-desc">Comparing the first real pull of the night to the last, and pinpointing when the night's best pull happened.</p>
+    <div class="trend-grid" id="trend-grid"></div>
+  </section>
+
+  <!-- HOUR BY HOUR -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Hour by hour</h2>
+      <span class="tag">Local raid time</span>
+    </div>
+    <p class="block-desc">Pull volume and average HP% remaining broken down by hour of the raid block, in local time. Shows whether progress held up, improved, or fell off as the night went on — more reliable than comparing a single first and last pull.</p>
+    <div class="chart-card">
+      <canvas id="chart-hourly" height="120"></canvas>
+    </div>
+  </section>
+
+  <!-- DOWNTIME -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Downtime between pulls</h2>
+      <span class="tag">Gaps · re-invites · breaks</span>
+    </div>
+    <p class="block-desc">Time elapsed between the end of one pull and the start of the next. A long gap usually means a break, a wipe recovery, or a re-invite — not lost progress.</p>
+    <div class="downtime-summary" id="downtime-summary"></div>
+    <div class="chart-card">
+      <canvas id="chart-downtime" height="120"></canvas>
+    </div>
+  </section>
+
+  <!-- PHASE COMPOSITION -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Where this night's pulls landed</h2>
+      <span class="tag">Phase composition</span>
+    </div>
+    <p class="block-desc">How the night's pulls split across phases reached. A wide current-wall segment means most attempts are consistently reaching the same point.</p>
+    <div class="chart-card">
+      <div class="phase-bar-wrap" id="phase-bar"></div>
+      <div class="phase-legend" id="phase-legend"></div>
+    </div>
+  </section>
+
+  <!-- ALL-TIME CONTEXT -->
+  <section class="block">
+    <div class="block-head">
+      <h2>How this night stacks up</h2>
+      <span class="tag">Vs. all-time best</span>
+    </div>
+    <p class="block-desc">This night's best pull and furthest phase compared against the best ever logged, across every prior raid night.</p>
+    <div class="context-strip" id="context-strip"></div>
+  </section>
+
+  <!-- PULL LOG -->
+  <section class="block">
+    <div class="block-head">
+      <h2>Pull log</h2>
+      <span class="tag" id="pull-log-tag">—</span>
+    </div>
+    <p class="block-desc">Every pull of the night, chronologically. Gold rows mark the night's best pull; green rows mark kills.</p>
+    <div class="chart-card" style="padding:6px 10px;">
+      <table class="session-table" id="pull-table">
+        <thead>
+          <tr>
+            <th class="num">#</th>
+            <th>Time (UTC)</th>
+            <th>Result</th>
+            <th>Phase</th>
+            <th class="num">HP% left</th>
+            <th class="num">Duration</th>
+            <th class="num">Gap before</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    2026-07-01 · Data pulled from FFLogs via the public v2 API
+  </footer>
+
+</div>
+
+<script>
+const DATA = {"night":{"date":"2026-07-01","total_pulls":19,"kills":0,"session_start_utc":"2026-07-01T18:10:45.071000+00:00","session_end_utc":"2026-07-01T21:03:23.452000+00:00","session_hours":2.88,"best_pct_remaining":51.72,"furthest_phase":3,"avg_pull_duration_seconds":429.4,"pulls_per_hour":6.6},"pulls":[{"index":1,"fight_id":1,"start_time_utc":"2026-07-01T18:10:45.071000+00:00","end_time_utc":"2026-07-01T18:21:58.715000+00:00","duration_seconds":673.6,"gap_since_previous_seconds":null,"kill":false,"fight_percentage":54.46,"last_phase":3,"is_reset":false,"running_best_pct":54.46},{"index":2,"fight_id":2,"start_time_utc":"2026-07-01T18:22:22.407000+00:00","end_time_utc":"2026-07-01T18:27:03.038000+00:00","duration_seconds":280.6,"gap_since_previous_seconds":23.7,"kill":false,"fight_percentage":81.62,"last_phase":2,"is_reset":false,"running_best_pct":54.46},{"index":3,"fight_id":3,"start_time_utc":"2026-07-01T18:27:27.433000+00:00","end_time_utc":"2026-07-01T18:28:20.738000+00:00","duration_seconds":53.3,"gap_since_previous_seconds":24.4,"kill":false,"fight_percentage":97.62,"last_phase":1,"is_reset":false,"running_best_pct":54.46},{"index":4,"fight_id":4,"start_time_utc":"2026-07-01T18:28:37.558000+00:00","end_time_utc":"2026-07-01T18:37:49.479000+00:00","duration_seconds":551.9,"gap_since_previous_seconds":16.8,"kill":false,"fight_percentage":61.71,"last_phase":3,"is_reset":false,"running_best_pct":54.46},{"index":5,"fight_id":5,"start_time_utc":"2026-07-01T18:38:11.796000+00:00","end_time_utc":"2026-07-01T18:43:04.970000+00:00","duration_seconds":293.2,"gap_since_previous_seconds":22.3,"kill":false,"fight_percentage":80.05,"last_phase":2,"is_reset":false,"running_best_pct":54.46},{"index":6,"fight_id":6,"start_time_utc":"2026-07-01T18:43:33.174000+00:00","end_time_utc":"2026-07-01T18:53:07.238000+00:00","duration_seconds":574.1,"gap_since_previous_seconds":28.2,"kill":false,"fight_percentage":59.28,"last_phase":3,"is_reset":false,"running_best_pct":54.46},{"index":7,"fight_id":7,"start_time_utc":"2026-07-01T18:53:31.296000+00:00","end_time_utc":"2026-07-01T18:55:08.608000+00:00","duration_seconds":97.3,"gap_since_previous_seconds":24.1,"kill":false,"fight_percentage":95.49,"last_phase":1,"is_reset":false,"running_best_pct":54.46},{"index":8,"fight_id":8,"start_time_utc":"2026-07-01T18:55:31.019000+00:00","end_time_utc":"2026-07-01T18:56:33.217000+00:00","duration_seconds":62.2,"gap_since_previous_seconds":22.4,"kill":false,"fight_percentage":97.35,"last_phase":1,"is_reset":false,"running_best_pct":54.46},{"index":9,"fight_id":9,"start_time_utc":"2026-07-01T18:56:50.712000+00:00","end_time_utc":"2026-07-01T19:01:53.408000+00:00","duration_seconds":302.7,"gap_since_previous_seconds":17.5,"kill":false,"fight_percentage":79.66,"last_phase":2,"is_reset":false,"running_best_pct":54.46},{"index":10,"fight_id":10,"start_time_utc":"2026-07-01T19:09:14.140000+00:00","end_time_utc":"2026-07-01T19:14:39.275000+00:00","duration_seconds":325.1,"gap_since_previous_seconds":440.7,"kill":false,"fight_percentage":76.82,"last_phase":2,"is_reset":false,"running_best_pct":54.46},{"index":11,"fight_id":11,"start_time_utc":"2026-07-01T19:14:58.254000+00:00","end_time_utc":"2026-07-01T19:26:54.882000+00:00","duration_seconds":716.6,"gap_since_previous_seconds":19.0,"kill":false,"fight_percentage":52.52,"last_phase":3,"is_reset":false,"running_best_pct":52.52},{"index":12,"fight_id":12,"start_time_utc":"2026-07-01T19:32:38.811000+00:00","end_time_utc":"2026-07-01T19:44:27.971000+00:00","duration_seconds":709.2,"gap_since_previous_seconds":343.9,"kill":false,"fight_percentage":51.99,"last_phase":3,"is_reset":false,"running_best_pct":51.99},{"index":13,"fight_id":13,"start_time_utc":"2026-07-01T19:47:04.541000+00:00","end_time_utc":"2026-07-01T19:49:00.252000+00:00","duration_seconds":115.7,"gap_since_previous_seconds":156.6,"kill":false,"fight_percentage":94.91,"last_phase":1,"is_reset":false,"running_best_pct":51.99},{"index":14,"fight_id":14,"start_time_utc":"2026-07-01T19:49:24.044000+00:00","end_time_utc":"2026-07-01T19:58:54.695000+00:00","duration_seconds":570.7,"gap_since_previous_seconds":23.8,"kill":false,"fight_percentage":59.99,"last_phase":3,"is_reset":false,"running_best_pct":51.99},{"index":15,"fight_id":15,"start_time_utc":"2026-07-01T20:12:08.705000+00:00","end_time_utc":"2026-07-01T20:23:45.335000+00:00","duration_seconds":696.6,"gap_since_previous_seconds":794.0,"kill":false,"fight_percentage":53.1,"last_phase":3,"is_reset":false,"running_best_pct":51.99},{"index":16,"fight_id":16,"start_time_utc":"2026-07-01T20:25:01.235000+00:00","end_time_utc":"2026-07-01T20:36:52.213000+00:00","duration_seconds":711.0,"gap_since_previous_seconds":75.9,"kill":false,"fight_percentage":51.72,"last_phase":3,"is_reset":false,"running_best_pct":51.72},{"index":17,"fight_id":17,"start_time_utc":"2026-07-01T20:38:24.151000+00:00","end_time_utc":"2026-07-01T20:43:28.444000+00:00","duration_seconds":304.3,"gap_since_previous_seconds":91.9,"kill":false,"fight_percentage":79.89,"last_phase":2,"is_reset":false,"running_best_pct":51.72},{"index":18,"fight_id":18,"start_time_utc":"2026-07-01T20:44:23.514000+00:00","end_time_utc":"2026-07-01T20:53:19.643000+00:00","duration_seconds":536.1,"gap_since_previous_seconds":55.1,"kill":false,"fight_percentage":61.65,"last_phase":3,"is_reset":false,"running_best_pct":51.72},{"index":19,"fight_id":19,"start_time_utc":"2026-07-01T20:53:39.613000+00:00","end_time_utc":"2026-07-01T21:03:23.452000+00:00","duration_seconds":583.8,"gap_since_previous_seconds":20.0,"kill":false,"fight_percentage":60.06,"last_phase":3,"is_reset":false,"running_best_pct":51.72}],"hourly":{"bucket_order":["20","21","22"],"bucket_labels":{"pre":"Pre-raid","late":"23:00+","20":"20:00\u201321:00","21":"21:00\u201322:00","22":"22:00\u201323:00"},"buckets":[{"bucket":"20","label":"20:00\u201321:00","pull_count":9,"kills":0,"avg_pct":78.6,"best_pct":54.46},{"bucket":"21","label":"21:00\u201322:00","pull_count":5,"kills":0,"avg_pct":67.2,"best_pct":51.99},{"bucket":"22","label":"22:00\u201323:00","pull_count":5,"kills":0,"avg_pct":61.3,"best_pct":51.72}]},"trend":{"direction":"improving","first_hour":{"bucket":"20","label":"20:00\u201321:00","pull_count":9,"kills":0,"avg_pct":78.6,"best_pct":54.46},"last_hour":{"bucket":"22","label":"22:00\u201323:00","pull_count":5,"kills":0,"avg_pct":61.3,"best_pct":51.72},"best_pull":{"index":16,"fight_id":16,"start_time_utc":"2026-07-01T20:25:01.235000+00:00","end_time_utc":"2026-07-01T20:36:52.213000+00:00","duration_seconds":711.0,"gap_since_previous_seconds":75.9,"kill":false,"fight_percentage":51.72,"last_phase":3,"is_reset":false,"running_best_pct":51.72},"best_pull_position":"late"},"downtime":{"gaps":[{"after_pull_index":14,"gap_seconds":794.0},{"after_pull_index":9,"gap_seconds":440.7},{"after_pull_index":11,"gap_seconds":343.9},{"after_pull_index":12,"gap_seconds":156.6},{"after_pull_index":16,"gap_seconds":91.9},{"after_pull_index":15,"gap_seconds":75.9},{"after_pull_index":17,"gap_seconds":55.1},{"after_pull_index":5,"gap_seconds":28.2},{"after_pull_index":2,"gap_seconds":24.4},{"after_pull_index":6,"gap_seconds":24.1},{"after_pull_index":13,"gap_seconds":23.8},{"after_pull_index":1,"gap_seconds":23.7},{"after_pull_index":7,"gap_seconds":22.4},{"after_pull_index":4,"gap_seconds":22.3},{"after_pull_index":18,"gap_seconds":20.0},{"after_pull_index":10,"gap_seconds":19.0},{"after_pull_index":8,"gap_seconds":17.5},{"after_pull_index":3,"gap_seconds":16.8}],"total_downtime_seconds":2200.3,"longest_gap_seconds":794.0,"avg_gap_seconds":122.2},"phase_composition":{"p3":10,"p2":5,"p1":4},"context":{"all_time_best_pct":51.72,"all_time_best_date":"2026-07-01","all_time_furthest_phase":3,"is_new_best_night":true,"nights_before_this_one":14}};
+</script>
+<script>
+(function(){
+  const PHASE_COLOR = { 1: '#ffc73f', 2: '#ff3f8f', 3: '#8b6bff', 4: '#57e0d0', 5: '#ff7a3f', 0: '#4a4160' };
+  const PHASE_NAMES = { 0: 'Reset', 1: 'Phase 1 · Kefka', 2: 'Phase 2 · God Kefka', 3: 'Phase 3 · Exdeath & Chaos', 4: 'Phase 4 · Kefka Says', 5: 'Phase 5 · Ultima Kefka' };
+
+  const night = DATA.night;
+  const pulls = DATA.pulls;
+  const hourly = DATA.hourly;
+  const trend = DATA.trend;
+  const downtime = DATA.downtime;
+  const phaseComp = DATA.phase_composition;
+  const context = DATA.context;
+
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#9c8fb8';
+  Chart.defaults.borderColor = '#352a48';
+
+  // ---- HERO ----
+  if (context.is_new_best_night) {
+    document.getElementById('hero-badge').innerHTML = '<span class="badge">New season best</span>';
+  }
+  document.getElementById('hero-title').innerHTML = `Raid night · <em>${fmtDate(night.date)}</em>`;
+  document.getElementById('hero-copy').textContent =
+    `${night.total_pulls} pulls over ${night.session_hours} hours. ` +
+    `Furthest reached: Phase ${night.furthest_phase} of 5. Kills: ${night.kills}. ` +
+    `Trend this night: ${trend.direction}.`;
+  document.getElementById('hero-num').innerHTML =
+    (night.best_pct_remaining != null ? night.best_pct_remaining : '—') + '<sup>%</sup>';
+
+  // ---- KPI STRIP ----
+  const kpis = [
+    { val: night.total_pulls, lbl: 'Total pulls' },
+    { val: night.session_hours + 'h', lbl: 'Session length' },
+    { val: night.pulls_per_hour ?? '—', lbl: 'Pulls / hour' },
+    { val: night.furthest_phase + ' / 5', lbl: 'Furthest phase' },
+    { val: night.kills, lbl: 'Kills' },
+    { val: (night.avg_pull_duration_seconds ?? '—') + 's', lbl: 'Avg pull length' },
+  ];
+  document.getElementById('kpi-strip').innerHTML = kpis.map(k =>
+    `<div class="kpi"><span class="val">${k.val}</span><div class="lbl">${k.lbl}</div></div>`
+  ).join('');
+
+  // ---- PULL TIMELINE CHART ----
+  const pointColors = pulls.map(p => p.is_reset ? '#4a4160' : (p.kill ? '#6ee7b7' : (PHASE_COLOR[p.last_phase] || '#ff3f8f')));
+  new Chart(document.getElementById('chart-timeline'), {
+    type: 'line',
+    data: {
+      labels: pulls.map(p => 'Pull ' + p.index),
+      datasets: [{
+        label: 'HP% remaining',
+        data: pulls.map(p => p.fight_percentage),
+        borderColor: '#8b6bff',
+        backgroundColor: pointColors,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        spanGaps: true,
+        tension: 0.15,
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { display: false } },
+        y: { reverse: true, min: 0, max: 100, title: { display: true, text: 'HP% remaining', color: '#6c6087' }, grid: { color: '#241b30' } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const p = pulls[item.dataIndex];
+              const outcome = p.is_reset ? 'Reset/practice' : (p.kill ? 'Kill' : `Wipe · Phase ${p.last_phase}`);
+              const gap = p.gap_since_previous_seconds != null ? `${Math.round(p.gap_since_previous_seconds)}s gap before` : 'First pull';
+              return [
+                `${outcome}`,
+                p.fight_percentage != null ? `${p.fight_percentage}% HP remaining` : 'No HP% recorded',
+                `${p.duration_seconds}s duration`,
+                gap,
+              ];
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // ---- TREND PANEL ----
+  const trendTag = trend.direction === 'insufficient_data' ? 'Not enough real pulls' : trend.direction;
+  document.getElementById('trend-tag').textContent = trendTag;
+  const positionLabel = { early: 'Early in the night', mid: 'Mid-night', late: 'Late in the night' };
+  const trendCards = [
+    {
+      lbl: 'First hour → last hour',
+      val: (trend.first_hour && trend.last_hour)
+        ? `${trend.first_hour.label} (${trend.first_hour.avg_pct}%) → ${trend.last_hour.label} (${trend.last_hour.avg_pct}%)`
+        : '—',
+      cls: trend.direction,
+      note: trend.direction === 'improving' ? 'Average HP% remaining got deeper as the night went on.'
+        : trend.direction === 'regressing' ? 'Later hours ended shallower than earlier ones — fatigue or a new wall.'
+        : trend.direction === 'plateauing' ? 'Progress held steady across the night.'
+        : 'Not enough hours with real pulls this night to call a trend.'
+    },
+    {
+      lbl: 'Best pull of the night',
+      val: trend.best_pull ? `${trend.best_pull.fight_percentage}% · Pull ${trend.best_pull.index}` : '—',
+      cls: '',
+      note: trend.best_pull ? `Reached Phase ${trend.best_pull.last_phase}.` : ''
+    },
+    {
+      lbl: 'When it happened',
+      val: trend.best_pull_position ? positionLabel[trend.best_pull_position] : '—',
+      cls: '',
+      note: trend.best_pull_position === 'late' ? 'The night’s best came late — momentum was building.'
+        : trend.best_pull_position === 'early' ? 'The night’s best came early — later pulls didn’t top it.'
+        : ''
+    },
+  ];
+  document.getElementById('trend-grid').innerHTML = trendCards.map(c => `
+    <div class="trend-card">
+      <div class="lbl">${c.lbl}</div>
+      <div class="val ${c.cls}">${c.val}</div>
+      <p>${c.note}</p>
+    </div>
+  `).join('');
+
+  // ---- HOUR-BY-HOUR CHART ----
+  new Chart(document.getElementById('chart-hourly'), {
+    data: {
+      labels: hourly.buckets.map(b => b.label),
+      datasets: [
+        { type: 'bar', label: 'Pulls', data: hourly.buckets.map(b => b.pull_count), backgroundColor: 'rgba(139,107,255,0.5)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Avg HP% remaining', data: hourly.buckets.map(b => b.avg_pct), borderColor: '#ffc73f', backgroundColor: '#ffc73f', yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { display: false } },
+        y: { title: { display: true, text: 'Pulls', color: '#6c6087' }, grid: { color: '#241b30' } },
+        y1: { position: 'right', min: 0, max: 100, title: { display: true, text: 'Avg HP% remaining', color: '#6c6087' }, grid: { display: false } },
+      },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 14 } } }
+    }
+  });
+
+  // ---- DOWNTIME ----
+  const dSummary = [
+    { val: fmtDuration(downtime.total_downtime_seconds), lbl: 'Total downtime' },
+    { val: downtime.longest_gap_seconds != null ? fmtDuration(downtime.longest_gap_seconds) : '—', lbl: 'Longest gap' },
+    { val: downtime.avg_gap_seconds != null ? fmtDuration(downtime.avg_gap_seconds) : '—', lbl: 'Avg gap' },
+  ];
+  document.getElementById('downtime-summary').innerHTML = dSummary.map(d =>
+    `<div class="d-item"><span class="val">${d.val}</span><div class="lbl">${d.lbl}</div></div>`
+  ).join('');
+
+  new Chart(document.getElementById('chart-downtime'), {
+    type: 'bar',
+    data: {
+      labels: downtime.gaps.map(g => `After pull ${g.after_pull_index}`),
+      datasets: [{
+        label: 'Gap (seconds)',
+        data: downtime.gaps.map(g => g.gap_seconds),
+        backgroundColor: 'rgba(139,107,255,0.5)',
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 60, minRotation: 60, font: { size: 9 } } },
+        y: { title: { display: true, text: 'Seconds', color: '#6c6087' }, grid: { color: '#241b30' } },
+      }
+    }
+  });
+
+  // ---- PHASE COMPOSITION BAR ----
+  const phaseKeys = Object.keys(phaseComp).sort((a, b) => {
+    const na = a === 'p0_reset' ? -1 : parseInt(a.replace('p', ''), 10);
+    const nb = b === 'p0_reset' ? -1 : parseInt(b.replace('p', ''), 10);
+    return na - nb;
+  });
+  const total = phaseKeys.reduce((sum, k) => sum + phaseComp[k], 0);
+  const barEl = document.getElementById('phase-bar');
+  const legendEl = document.getElementById('phase-legend');
+  phaseKeys.forEach(key => {
+    const phaseNum = key === 'p0_reset' ? 0 : parseInt(key.replace('p', ''), 10);
+    const count = phaseComp[key];
+    const pct = total > 0 ? (count / total * 100) : 0;
+    const seg = document.createElement('div');
+    seg.className = 'phase-bar-seg';
+    seg.style.width = pct + '%';
+    seg.style.background = PHASE_COLOR[phaseNum] || '#4a4160';
+    seg.textContent = pct >= 8 ? count : '';
+    seg.title = `${PHASE_NAMES[phaseNum] || key}: ${count} pulls`;
+    barEl.appendChild(seg);
+  });
+  legendEl.innerHTML = phaseKeys.map(key => {
+    const phaseNum = key === 'p0_reset' ? 0 : parseInt(key.replace('p', ''), 10);
+    return `<span class="tag2"><span class="swatch" style="background:${PHASE_COLOR[phaseNum] || '#4a4160'}"></span>${PHASE_NAMES[phaseNum] || key} (${phaseComp[key]})</span>`;
+  }).join('');
+
+  // ---- ALL-TIME CONTEXT ----
+  const contextCards = [
+    {
+      lbl: "This night's best vs all-time",
+      val: `${night.best_pct_remaining}% vs ${context.all_time_best_pct}%`,
+      sub: context.is_new_best_night ? 'New season best set this night.' : `All-time best set ${fmtDate(context.all_time_best_date)}.`
+    },
+    {
+      lbl: 'Furthest phase vs all-time',
+      val: `Phase ${night.furthest_phase} / ${context.all_time_furthest_phase}`,
+      sub: night.furthest_phase >= context.all_time_furthest_phase ? 'Matched or extended the furthest phase reached.' : 'Below the furthest phase reached on other nights.'
+    },
+    {
+      lbl: 'Raid nights logged before this one',
+      val: context.nights_before_this_one,
+      sub: 'Nights of history this comparison is built on.'
+    },
+  ];
+  document.getElementById('context-strip').innerHTML = contextCards.map(c => `
+    <div class="context-card">
+      <div class="lbl">${c.lbl}</div>
+      <div class="val">${c.val}</div>
+      <div class="sub">${c.sub}</div>
+    </div>
+  `).join('');
+
+  // ---- PULL LOG TABLE ----
+  document.getElementById('pull-log-tag').textContent = `${pulls.length} pulls`;
+  const bestIndex = trend.best_pull ? trend.best_pull.index : null;
+  const tbody = document.querySelector('#pull-table tbody');
+  tbody.innerHTML = pulls.map(p => {
+    const rowClass = p.kill ? 'kill' : (p.index === bestIndex ? 'best' : '');
+    const result = p.kill ? '<span class="kill-pill">Kill</span>' : (p.is_reset ? 'Reset' : 'Wipe');
+    return `
+    <tr class="${rowClass}">
+      <td class="num">${p.index}</td>
+      <td>${fmtTime(p.start_time_utc)}</td>
+      <td>${result}</td>
+      <td><span class="phase-pill p${p.last_phase}">Phase ${p.last_phase}</span></td>
+      <td class="num">${p.fight_percentage != null ? p.fight_percentage + '%' : '—'}</td>
+      <td class="num">${p.duration_seconds}s</td>
+      <td class="num">${p.gap_since_previous_seconds != null ? fmtDuration(p.gap_since_previous_seconds) : '—'}</td>
+    </tr>
+  `;
+  }).join('');
+
+  // ---- helpers ----
+  function fmtDate(d){
+    const dt = new Date(d + 'T00:00:00Z');
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone:'UTC' });
+  }
+  function fmtTime(iso){
+    const dt = new Date(iso);
+    return dt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'UTC' }) + ' UTC';
+  }
+  function fmtDuration(sec){
+    if (sec == null) return '—';
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+})();
+</script>
+</body>
+</html>

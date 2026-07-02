@@ -9,8 +9,10 @@ phase reached, pitfalls, hour-by-hour performance, etc.).
 | File | Purpose |
 |---|---|
 | `fetch_dmu_logs.py` | Pulls raw pull data from FFLogs → `pulls.csv` |
-| `build_dashboard.py` | Turns `pulls.csv` into the HTML dashboard |
+| `build_dashboard.py` | Turns `pulls.csv` into the full-history HTML dashboard |
 | `dashboard_template.html` | Visual shell used by `build_dashboard.py` — keep it alongside the script |
+| `build_night_report.py` | Turns `pulls.csv` into a deep-dive HTML report for one raid night |
+| `night_report_template.html` | Visual shell used by `build_night_report.py` — keep it alongside the script |
 | `requirements.txt` | Python dependencies for both scripts |
 
 Keep all four in the same folder. Re-running the two scripts in sequence is
@@ -173,6 +175,56 @@ soon as they start appearing in `pulls.csv`, no template changes needed.
 **Keep `dashboard_template.html` next to `build_dashboard.py`** — it's the
 visual shell the script injects data into. Editing the template lets you
 restyle the dashboard without touching the data logic at all.
+
+---
+
+## 7. Build a single raid-night report
+
+`build_dashboard.py` looks at every raid night together. If you just want to
+see what happened *last* night — pull-by-pull timeline, whether the group
+was improving or plateauing, downtime between pulls, and how the night
+compares to the all-time best — use `build_night_report.py` instead:
+
+```bash
+python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
+```
+
+By default this picks the most recent raid night present in `pulls.csv`. To
+look at a specific past night instead:
+
+```bash
+python build_night_report.py --pulls-csv ./dmu_data/pulls.csv --date 2026-06-24
+```
+
+This writes `dmu_night_report.html` in the current folder.
+
+### Two refresh loops
+
+- **After each raid night** — a quick single-night recap:
+  ```bash
+  python fetch_dmu_logs.py --guild-id 102435
+  python build_night_report.py --pulls-csv ./dmu_data/pulls.csv
+  ```
+- **Occasionally** — the full multi-night dashboard:
+  ```bash
+  python fetch_dmu_logs.py --guild-id 102435
+  python build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
+  ```
+
+Both read the same `pulls.csv` — there's nothing to keep in sync between
+them, and running one doesn't require the other.
+
+### `build_night_report.py` flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--pulls-csv` | *(required)* | Path to `pulls.csv` |
+| `--date` | most recent night in `pulls.csv` | Raid night to analyze (`YYYY-MM-DD`) |
+| `--template` | `night_report_template.html` | HTML template to inject data into |
+| `--out` | `dmu_night_report.html` | Output file path |
+
+**Keep `night_report_template.html` next to `build_night_report.py`** — same
+role as `dashboard_template.html`, just for the single-night report.
 
 ---
 

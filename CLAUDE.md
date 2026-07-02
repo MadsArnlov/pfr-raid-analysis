@@ -19,23 +19,34 @@ night.
 ## How the pieces fit together
 
 ```
-FFLogs API  →  fetch_dmu_logs.py  →  pulls.csv  →  build_dashboard.py  →  dmu_raid_dashboard.html
+FFLogs API  →  fetch_dmu_logs.py  →  pulls.csv  →  build_dashboard.py     →  dmu_raid_dashboard.html
                                    →  reports_raw.json (backup)
-                                   →  session_summary.json (legacy, not required by build_dashboard.py)
+                                   →  session_summary.json (legacy, not required by either build script)
+                                   →  pulls.csv  →  build_night_report.py →  dmu_night_report.html
 ```
+
+There are two independent downstream builds off the same `pulls.csv`:
+`build_dashboard.py` for the full multi-night history, and
+`build_night_report.py` for a deep dive on one raid night (latest by
+default, or a specific `--date`). Neither requires the other to run first —
+both start from a fresh `pulls.csv` fetch.
 
 | File | Role |
 |---|---|
 | `main.py` | Authenticates to FFLogs v2 GraphQL API (client-credentials flow), fetches all reports for the guild filtered to the DMU zone, flattens every pull into `pulls.csv`. |
 | `pulls.csv` | Source of truth. One row per pull: date/time, kill/wipe, `fight_percentage`, `boss_percentage`, `last_phase`, duration. Everything downstream is derived from this file alone. |
-| `build_dashboard.py` | Reads `pulls.csv`, computes all aggregates (session boundaries, phase histograms, hour-by-raid-night grid), injects them as JSON into `dashboard_template.html`, writes the final HTML. |
+| `build_dashboard.py` | Reads `pulls.csv`, computes all cross-night aggregates (session boundaries, phase histograms, hour-by-raid-night grid), injects them as JSON into `dashboard_template.html`, writes the final HTML. |
 | `dashboard_template.html` | The visual shell — HTML/CSS/Chart.js. Contains `__DATA_JSON__`, `__DATE_RANGE__`, `__RESET_NOTE__` placeholders that `build_dashboard.py` fills in. All data access in the JS reads from a single injected `DATA` object. |
-| `dmu_raid_dashboard.html` | Final build artifact. Fully self-contained (Chart.js loaded from cdnjs, fonts from Google Fonts) — can be opened directly in a browser or hosted as a static file. |
+| `dmu_raid_dashboard.html` | Final build artifact of `build_dashboard.py`. Fully self-contained (Chart.js loaded from cdnjs, fonts from Google Fonts) — can be opened directly in a browser or hosted as a static file. |
+| `build_night_report.py` | Reads `pulls.csv`, filters to one raid night (latest, or `--date`), computes a pull-by-pull timeline plus trend/downtime/phase-composition for that night and an all-time-best comparison against the rest of `pulls.csv`, injects them into `night_report_template.html`. |
+| `night_report_template.html` | The visual shell for the single-night report — same theme/fonts/Chart.js as `dashboard_template.html` (CSS intentionally duplicated, not shared) but built around a pull-level timeline instead of cross-night aggregates. Same `__DATA_JSON__` / `__DATE_RANGE__` placeholder mechanism. |
+| `dmu_night_report.html` | Final build artifact of `build_night_report.py`. Self-contained the same way as `dmu_raid_dashboard.html`. |
 
-**Rule of thumb:** styling and layout changes go in `dashboard_template.html`.
-Data/aggregation changes go in `build_dashboard.py`. Don't hand-edit
-`dmu_raid_dashboard.html` — it's a generated artifact and will be overwritten
-on the next build.
+**Rule of thumb:** styling and layout changes go in the relevant template
+file (`dashboard_template.html` or `night_report_template.html`).
+Data/aggregation changes go in the matching build script. Don't hand-edit
+`dmu_raid_dashboard.html` or `dmu_night_report.html` — they're generated
+artifacts and will be overwritten on the next build.
 
 ## Domain knowledge specific to this project
 
@@ -98,6 +109,12 @@ uv sync
 
 uv run main.py --guild-id 102435
 uv run build_dashboard.py --pulls-csv ./dmu_data/pulls.csv
+
+# after each raid night, for a quick single-night recap instead:
+uv run main.py --guild-id 102435
+uv run build_night_report.py --pulls-csv ./dmu_data/pulls.csv
+# or a specific past night:
+uv run build_night_report.py --pulls-csv ./dmu_data/pulls.csv --date 2026-06-24
 ```
 
 See `README.md` for full setup and flag documentation.

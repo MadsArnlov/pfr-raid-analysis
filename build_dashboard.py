@@ -19,6 +19,11 @@ Optional flags:
                                             # 1 = CET/winter)
     --raid-start-hour 20                   # local hour your raid block starts
     --raid-length-hours 3                  # length of the raid block
+    --wall-min-pulls-since-record 15       # pulls since the last all-time-best
+                                            # pull before a "wall" can be flagged
+    --wall-max-stdev 6.0                   # max stdev of fight_percentage in the
+                                            # recent window for a wall to be flagged
+                                            # (tight cluster = likely a real wall)
 
 Typical refresh workflow:
 
@@ -53,6 +58,131 @@ def build_bucket_order_and_labels(raid_start: int, raid_length: int):
     return order, labels
 
 
+def compute_progression(real: pd.DataFrame, wall_min_pulls: int, wall_max_stdev: float) -> dict:
+    """Track all-time-best "record" pulls chronologically. Feeds three related
+    reads on the same underlying log: progression velocity (pulls between
+    records \u2014 is the gap growing normally or has it spiked?), time since the
+    last new best, and a "wall" heuristic (long dry spell + tight clustering
+    of recent results = likely stuck on one specific mechanic, not bad luck)."""
+    real_sorted = real.sort_values("start_time_utc").reset_index(drop=True)
+
+    record_positions = []
+    running_best = None
+    for i, pct in enumerate(real_sorted["fight_percentage"]):
+        if running_best is None or pct < running_best:
+            record_positions.append(i)
+            running_best = pct
+
+    records = []
+    for k, pos in enumerate(record_positions):
+        row = real_sorted.iloc[pos]
+        if k == 0:
+            pulls_since_prior = 0
+            nights_since_prior = 0
+        else:
+            prior_pos = record_positions[k - 1]
+            pulls_since_prior = pos - prior_pos
+            nights_since_prior = int(real_sorted.iloc[prior_pos + 1:pos + 1]["date"].nunique())
+        records.append({
+            "date": row["date"],
+            "pull_global_index": int(pos) + 1,
+            "fight_percentage": float(row["fight_percentage"]),
+            "last_phase": int(row["last_phase"]),
+            "pulls_since_prior_record": int(pulls_since_prior),
+            "nights_since_prior_record": int(nights_since_prior),
+        })
+
+    last_pos = record_positions[-1]
+    total_real_pulls = len(real_sorted)
+    pulls_since_last_record = total_real_pulls - 1 - last_pos
+    nights_since_last_record = int(real_sorted.iloc[last_pos + 1:]["date"].nunique())
+    current = {
+        "pulls_since_last_record": int(pulls_since_last_record),
+        "nights_since_last_record": nights_since_last_record,
+        "last_record_date": records[-1]["date"],
+        "last_record_pct": records[-1]["fight_percentage"],
+    }
+
+    # Window for the wall check: whichever is larger of "everything since the
+    # last record" or "the last two raid nights" (guards against a long dry
+    # spell within a single very-long night looking like a multi-night wall).
+    window_by_pulls = real_sorted.iloc[last_pos + 1:]
+    two_latest_dates = sorted(real_sorted["date"].unique())[-2:]
+    window_by_nights = real_sorted[real_sorted["date"].isin(two_latest_dates)]
+    window = window_by_pulls if len(window_by_pulls) >= len(window_by_nights) else window_by_nights
+
+    wall = {"is_walled": False, "phase": None, "band": None, "stdev": None}
+    if pulls_since_last_record >= wall_min_pulls and len(window) >= 2:
+        stdev = float(window["fight_percentage"].std())
+        if stdev <= wall_max_stdev:
+            phase_mode = int(window["last_phase"].mode().iloc[0])
+            band = f"{int(window['fight_percentage'].min())}-{int(window['fight_percentage'].max())}"
+            wall = {"is_walled": True, "phase": phase_mode, "band": band, "stdev": round(stdev, 2)}
+
+    return {"records": records, "current": current, "wall": wall}
+
+
+def compute_phase_conversion(real: pd.DataFrame) -> list:
+    """For each phase reached, what share of pulls that got that far survived
+    it and pushed into the next phase (vs. wiped and ended the pull there).
+    The final entry compares pulls reaching the deepest phase against actual
+    kills — i.e. the clear rate out of the current wall."""
+    if real.empty:
+        return []
+    max_phase = int(real["last_phase"].max())
+    conversion = []
+    for p in range(1, max_phase):
+        entered = int((real["last_phase"] >= p).sum())
+        converted = int((real["last_phase"] > p).sum())
+        conversion.append({
+            "from_phase": p,
+            "to_phase": p + 1,
+            "entered": entered,
+            "converted": converted,
+            "rate_pct": round(converted / entered * 100, 1) if entered else None,
+        })
+    entered_final = int((real["last_phase"] >= max_phase).sum())
+    kills = int(real.loc[real["last_phase"] >= max_phase, "kill"].fillna(False).astype(bool).sum())
+    conversion.append({
+        "from_phase": max_phase,
+        "to_phase": "kill",
+        "entered": entered_final,
+        "converted": kills,
+        "rate_pct": round(kills / entered_final * 100, 1) if entered_final else None,
+    })
+    return conversion
+
+
+def compute_phase_conversion_by_session(real: pd.DataFrame, dates: list) -> dict:
+    """Same phase-to-phase conversion as compute_phase_conversion, but broken
+    out per raid night so the dashboard can chart how each transition's
+    survival rate is trending over time. Transitions are fixed to the
+    all-time deepest phase reached (so every night's line lines up on the
+    same x-axis); a night with zero pulls reaching a given phase leaves that
+    point null rather than 0, so the chart should use spanGaps."""
+    if real.empty:
+        return {"transitions": [], "sessions": []}
+    max_phase = int(real["last_phase"].max())
+    transitions = [{"from_phase": p, "to_phase": p + 1} for p in range(1, max_phase)]
+    transitions.append({"from_phase": max_phase, "to_phase": "kill"})
+
+    sessions = []
+    for d in dates:
+        day = real[real["date"] == d]
+        rates = []
+        for t in transitions:
+            p = t["from_phase"]
+            entered = int((day["last_phase"] >= p).sum())
+            if t["to_phase"] == "kill":
+                converted = int(day.loc[day["last_phase"] >= p, "kill"].fillna(False).astype(bool).sum())
+            else:
+                converted = int((day["last_phase"] > p).sum())
+            rates.append(round(converted / entered * 100, 1) if entered else None)
+        sessions.append({"date": d, "rates": rates})
+
+    return {"transitions": transitions, "sessions": sessions}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -71,6 +201,14 @@ def main():
                               "default 20 (8pm)")
     parser.add_argument("--raid-length-hours", type=int, default=3,
                          help="Length of your raid block in hours, default 3")
+    parser.add_argument("--wall-min-pulls-since-record", type=int, default=15,
+                         help="Minimum real pulls since the last all-time-best "
+                              "pull before a 'wall' can be flagged, default 15")
+    parser.add_argument("--wall-max-stdev", type=float, default=6.0,
+                         help="Max stdev of fight_percentage in the recent "
+                              "window for a wall to be flagged — a tight "
+                              "cluster suggests one specific mechanic rather "
+                              "than inconsistent play, default 6.0")
     args = parser.parse_args()
 
     pulls_path = Path(args.pulls_csv)
@@ -106,6 +244,7 @@ def main():
         furthest_phase = int(day["last_phase"].max()) if len(day) else None
         avg_duration = round(float(day["duration_seconds"].mean()), 1) if len(day) else None
         pulls_per_hour = round(total_pulls / session_hours, 1) if session_hours > 0 else None
+        pct_stdev = round(float(day_real["fight_percentage"].std()), 2) if len(day_real) >= 2 else None
         sessions.append({
             "date": d,
             "total_pulls": total_pulls,
@@ -115,6 +254,7 @@ def main():
             "avg_pull_duration_seconds": avg_duration,
             "session_hours": session_hours,
             "pulls_per_hour": pulls_per_hour,
+            "pct_stdev": pct_stdev,
         })
 
     overview = {
@@ -143,6 +283,7 @@ def main():
             "min_pct": float(sub["fight_percentage"].min()),
             "max_pct": float(sub["fight_percentage"].max()),
             "mean_pct": round(float(sub["fight_percentage"].mean()), 2),
+            "stdev_pct": round(float(sub["fight_percentage"].std()), 2) if len(sub) >= 2 else None,
             "histogram": hist_list,
             "wall_bucket": mode_bin,
         }
@@ -236,6 +377,10 @@ def main():
             "best_pct_remaining": min((h["best_pct_remaining"] for h in valid), default=None),
         })
 
+    progression = compute_progression(real, args.wall_min_pulls_since_record, args.wall_max_stdev)
+    phase_conversion = compute_phase_conversion(real)
+    phase_conversion_by_session = compute_phase_conversion_by_session(real, dates)
+
     data = {
         "overview": overview,
         "sessions": sessions,
@@ -243,6 +388,9 @@ def main():
         "phase_composition": phase_composition,
         "hourly_cest": hourly_cest,
         "position_stats": position_stats,
+        "progression": progression,
+        "phase_conversion": phase_conversion,
+        "phase_conversion_by_session": phase_conversion_by_session,
     }
 
     # ---------------- inject into template ----------------
