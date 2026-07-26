@@ -39,8 +39,8 @@ def load_pulls(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     if df.empty:
         raise SystemExit(f"ERROR: {csv_path} has no rows.")
-    df["start_time_utc"] = pd.to_datetime(df["start_time_utc"])
-    df["end_time_utc"] = pd.to_datetime(df["end_time_utc"])
+    df["start_time_utc"] = pd.to_datetime(df["start_time_utc"], format="ISO8601")
+    df["end_time_utc"] = pd.to_datetime(df["end_time_utc"], format="ISO8601")
     df["date"] = df["start_time_utc"].dt.date.astype(str)
     df["kill"] = df["kill"].eq(True)  # null kill flag counts as a wipe
     return df
