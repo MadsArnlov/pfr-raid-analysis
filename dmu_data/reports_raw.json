@@ -1,9 +1,9 @@
 [
   {
-    "code": "JvprVwBPX4KzT9Zc",
-    "report_end_time": 1785099084015,
+    "code": "YBLwVh7Nx2k3m6Dg",
+    "report_end_time": 1785185733697,
     "title": "Dancing Mad (Ultimate) P3/P4",
-    "startTime": 1785088786293,
+    "startTime": 1785175249639,
     "zone": {
       "name": "Dancing Mad"
     },
@@ -14,11 +14,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 61268,
-        "endTime": 330641,
-        "fightPercentage": 82.97,
-        "bossPercentage": 64.86,
-        "lastPhase": 2
+        "startTime": 59429,
+        "endTime": 779287,
+        "fightPercentage": 52.18,
+        "bossPercentage": 10.92,
+        "lastPhase": 3
       },
       {
         "id": 2,
@@ -26,10 +26,10 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 365089,
-        "endTime": 424181,
-        "fightPercentage": 97.52,
-        "bossPercentage": 75.22,
+        "startTime": 921901,
+        "endTime": 984686,
+        "fightPercentage": 97.29,
+        "bossPercentage": 72.95,
         "lastPhase": 1
       },
       {
@@ -38,11 +38,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 442280,
-        "endTime": 776048,
-        "fightPercentage": 76.88,
-        "bossPercentage": 34.43,
-        "lastPhase": 2
+        "startTime": 1004870,
+        "endTime": 1134576,
+        "fightPercentage": 94.66,
+        "bossPercentage": 46.68,
+        "lastPhase": 1
       },
       {
         "id": 4,
@@ -50,11 +50,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 806900,
-        "endTime": 1424653,
-        "fightPercentage": 56.7,
-        "bossPercentage": 33.53,
-        "lastPhase": 3
+        "startTime": 1156920,
+        "endTime": 1357526,
+        "fightPercentage": 91.35,
+        "bossPercentage": 13.55,
+        "lastPhase": 1
       },
       {
         "id": 5,
@@ -62,11 +62,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 1463015,
-        "endTime": 1946612,
-        "fightPercentage": 66.75,
-        "bossPercentage": 83.78,
-        "lastPhase": 3
+        "startTime": 1379404,
+        "endTime": 2158402,
+        "fightPercentage": 46.5,
+        "bossPercentage": 82.54,
+        "lastPhase": 4
       },
       {
         "id": 6,
@@ -74,11 +74,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 1980933,
-        "endTime": 2267070,
-        "fightPercentage": 81.6,
-        "bossPercentage": 58.02,
-        "lastPhase": 2
+        "startTime": 2348375,
+        "endTime": 2524731,
+        "fightPercentage": 92.16,
+        "bossPercentage": 21.6,
+        "lastPhase": 1
       },
       {
         "id": 7,
@@ -86,11 +86,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 2423512,
-        "endTime": 3109655,
-        "fightPercentage": 52.38,
-        "bossPercentage": 11.94,
-        "lastPhase": 3
+        "startTime": 2545257,
+        "endTime": 2744421,
+        "fightPercentage": 91.44,
+        "bossPercentage": 14.43,
+        "lastPhase": 1
       },
       {
         "id": 8,
@@ -98,11 +98,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 3157680,
-        "endTime": 3481610,
-        "fightPercentage": 76.97,
-        "bossPercentage": 34.87,
-        "lastPhase": 2
+        "startTime": 2765239,
+        "endTime": 2939318,
+        "fightPercentage": 92.18,
+        "bossPercentage": 21.88,
+        "lastPhase": 1
       },
       {
         "id": 9,
@@ -110,10 +110,10 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 3967282,
-        "endTime": 4506073,
-        "fightPercentage": 61.88,
-        "bossPercentage": 59.44,
+        "startTime": 3585235,
+        "endTime": 4127588,
+        "fightPercentage": 61.71,
+        "bossPercentage": 58.56,
         "lastPhase": 3
       },
       {
@@ -122,11 +122,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 4562695,
-        "endTime": 4621874,
-        "fightPercentage": 97.49,
-        "bossPercentage": 74.95,
-        "lastPhase": 1
+        "startTime": 4163588,
+        "endTime": 4547440,
+        "fightPercentage": 70,
+        "bossPercentage": 0.01,
+        "lastPhase": 2
       },
       {
         "id": 11,
@@ -134,11 +134,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 4645125,
-        "endTime": 5304596,
-        "fightPercentage": 54.35,
-        "bossPercentage": 21.77,
-        "lastPhase": 3
+        "startTime": 4575931,
+        "endTime": 4748020,
+        "fightPercentage": 92.6,
+        "bossPercentage": 26.02,
+        "lastPhase": 1
       },
       {
         "id": 12,
@@ -146,11 +146,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 5374673,
-        "endTime": 5651315,
-        "fightPercentage": 81.36,
-        "bossPercentage": 56.8,
-        "lastPhase": 2
+        "startTime": 4770949,
+        "endTime": 5434870,
+        "fightPercentage": 53.42,
+        "bossPercentage": 17.14,
+        "lastPhase": 3
       },
       {
         "id": 13,
@@ -158,11 +158,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 5674031,
-        "endTime": 6482690,
-        "fightPercentage": 41.6,
-        "bossPercentage": 58.01,
-        "lastPhase": 4
+        "startTime": 5474953,
+        "endTime": 6089893,
+        "fightPercentage": 57.42,
+        "bossPercentage": 37.12,
+        "lastPhase": 3
       },
       {
         "id": 14,
@@ -170,11 +170,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 6821504,
-        "endTime": 7481600,
-        "fightPercentage": 56.76,
-        "bossPercentage": 33.83,
-        "lastPhase": 3
+        "startTime": 6115740,
+        "endTime": 6201108,
+        "fightPercentage": 96.51,
+        "bossPercentage": 65.18,
+        "lastPhase": 1
       },
       {
         "id": 15,
@@ -182,11 +182,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 7888572,
-        "endTime": 8224507,
-        "fightPercentage": 75.47,
-        "bossPercentage": 27.35,
-        "lastPhase": 2
+        "startTime": 6230598,
+        "endTime": 6287640,
+        "fightPercentage": 97.58,
+        "bossPercentage": 75.86,
+        "lastPhase": 1
       },
       {
         "id": 16,
@@ -194,11 +194,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 8263691,
-        "endTime": 8923232,
-        "fightPercentage": 54.04,
-        "bossPercentage": 20.23,
-        "lastPhase": 3
+        "startTime": 6306834,
+        "endTime": 6635449,
+        "fightPercentage": 77.01,
+        "bossPercentage": 35.08,
+        "lastPhase": 2
       },
       {
         "id": 17,
@@ -206,11 +206,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 8951602,
-        "endTime": 9257417,
-        "fightPercentage": 79.23,
-        "bossPercentage": 46.19,
-        "lastPhase": 2
+        "startTime": 6656060,
+        "endTime": 6688942,
+        "fightPercentage": 98.37,
+        "bossPercentage": 83.76,
+        "lastPhase": 1
       },
       {
         "id": 18,
@@ -218,11 +218,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 9291622,
-        "endTime": 9320039,
-        "fightPercentage": 98.61,
-        "bossPercentage": 86.1,
-        "lastPhase": 1
+        "startTime": 7393843,
+        "endTime": 7997044,
+        "fightPercentage": 58.03,
+        "bossPercentage": 40.18,
+        "lastPhase": 3
       },
       {
         "id": 19,
@@ -230,11 +230,11 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 9347027,
-        "endTime": 9639337,
-        "fightPercentage": 80.62,
-        "bossPercentage": 53.12,
-        "lastPhase": 2
+        "startTime": 8033454,
+        "endTime": 8646529,
+        "fightPercentage": 57.31,
+        "bossPercentage": 36.55,
+        "lastPhase": 3
       },
       {
         "id": 20,
@@ -242,11 +242,47 @@
         "encounterID": 1085,
         "kill": false,
         "difficulty": 100,
-        "startTime": 9662079,
-        "endTime": 10297722,
-        "fightPercentage": 55.31,
-        "bossPercentage": 26.56,
+        "startTime": 8680958,
+        "endTime": 8739895,
+        "fightPercentage": 97.54,
+        "bossPercentage": 75.4,
+        "lastPhase": 1
+      },
+      {
+        "id": 21,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 8758169,
+        "endTime": 9385573,
+        "fightPercentage": 55.69,
+        "bossPercentage": 28.46,
         "lastPhase": 3
+      },
+      {
+        "id": 22,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 9424645,
+        "endTime": 10127258,
+        "fightPercentage": 51.88,
+        "bossPercentage": 9.44,
+        "lastPhase": 3
+      },
+      {
+        "id": 23,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 10157698,
+        "endTime": 10484058,
+        "fightPercentage": 77.43,
+        "bossPercentage": 37.17,
+        "lastPhase": 2
       }
     ]
   },
