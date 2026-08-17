@@ -1,5 +1,184 @@
 [
   {
+    "code": "LA2GXxyWtMj4fdcH",
+    "report_end_time": 1786913660576,
+    "title": "Dancing Mad (Ultimate)",
+    "startTime": 1786902776630,
+    "zone": {
+      "name": "Dancing Mad"
+    },
+    "fights": [
+      {
+        "id": 1,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 598217,
+        "endTime": 1405495,
+        "fightPercentage": 40.32,
+        "bossPercentage": 51.62,
+        "lastPhase": 4
+      },
+      {
+        "id": 2,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 1440591,
+        "endTime": 2304274,
+        "fightPercentage": 35.88,
+        "bossPercentage": 29.42,
+        "lastPhase": 4
+      },
+      {
+        "id": 3,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 2407244,
+        "endTime": 2605433,
+        "fightPercentage": 91.28,
+        "bossPercentage": 12.87,
+        "lastPhase": 1
+      },
+      {
+        "id": 4,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 2708440,
+        "endTime": 3574977,
+        "fightPercentage": 35.94,
+        "bossPercentage": 29.72,
+        "lastPhase": 4
+      },
+      {
+        "id": 5,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 3698246,
+        "endTime": 3753267,
+        "fightPercentage": 97.5,
+        "bossPercentage": 75.04,
+        "lastPhase": 1
+      },
+      {
+        "id": 6,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 3770588,
+        "endTime": 4099547,
+        "fightPercentage": 77.2,
+        "bossPercentage": 36.03,
+        "lastPhase": 2
+      },
+      {
+        "id": 7,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 4501415,
+        "endTime": 5374097,
+        "fightPercentage": 36.55,
+        "bossPercentage": 32.76,
+        "lastPhase": 4
+      },
+      {
+        "id": 8,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 5496081,
+        "endTime": 5781614,
+        "fightPercentage": 81.39,
+        "bossPercentage": 56.97,
+        "lastPhase": 2
+      },
+      {
+        "id": 9,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 5806210,
+        "endTime": 5883097,
+        "fightPercentage": 96.73,
+        "bossPercentage": 67.31,
+        "lastPhase": 1
+      },
+      {
+        "id": 10,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 5902662,
+        "endTime": 6294365,
+        "fightPercentage": 70.03,
+        "bossPercentage": 0.17,
+        "lastPhase": 2
+      },
+      {
+        "id": 11,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 6316086,
+        "endTime": 7170509,
+        "fightPercentage": 36.49,
+        "bossPercentage": 32.46,
+        "lastPhase": 4
+      },
+      {
+        "id": 12,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 7764044,
+        "endTime": 8713626,
+        "fightPercentage": 25.02,
+        "bossPercentage": 83.42,
+        "lastPhase": 5
+      },
+      {
+        "id": 13,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 8984553,
+        "endTime": 9928236,
+        "fightPercentage": 25.15,
+        "bossPercentage": 83.86,
+        "lastPhase": 5
+      },
+      {
+        "id": 14,
+        "name": "Dancing Mad",
+        "encounterID": 1085,
+        "kill": false,
+        "difficulty": 100,
+        "startTime": 10050048,
+        "endTime": 10828546,
+        "fightPercentage": 44.01,
+        "bossPercentage": 70.05,
+        "lastPhase": 4
+      }
+    ]
+  },
+  {
     "code": "YbNC6wfVg71k9cyT",
     "report_end_time": 1786568517964,
     "title": "Dancing Mad (Ultimate)",
